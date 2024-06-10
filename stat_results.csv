@@ -48,4 +48,39 @@
 46,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,vertical,default settings
 47,StandardScaler,XGBClassifier,0.7784614524045924,0.7784614524045924,0.7784614524045924,71509.0,vertical,default settings
 48,StandardScaler,CatBoostClassifier,0.8460893034443216,0.8460893034443216,0.8460893034443216,71509.0,vertical,default settings
-0,StandardScaler,LGBMClassifier,0.8434462794892951,0.8434462794892951,0.8434462794892951,71509.0,vertical,default settings
+49,StandardScaler,LGBMClassifier,0.8434462794892951,0.8434462794892951,0.8434462794892951,71509.0,vertical,default settings
+50,StandardScaler,XGBClassifier,0.7799857360611951,0.7799857360611951,0.7799857360611951,71509.0,vertical,default settings
+51,StandardScaler,CatBoostClassifier,0.8475856185934637,0.8475856185934637,0.8475856185934637,71509.0,vertical,default settings
+52,StandardScaler,LGBMClassifier,0.8429008935938134,0.8429008935938134,0.8429008935938134,71509.0,vertical,default settings
+53,StandardScaler,XGBClassifier,0.6641685658757568,0.6641685658757568,0.6641685658757568,71521.0,side,default settings
+54,StandardScaler,CatBoostClassifier,0.7729198417248081,0.7729198417248081,0.7729198417248081,71521.0,side,default settings
+55,StandardScaler,LGBMClassifier,0.7651878469260777,0.7651878469260777,0.7651878469260776,71521.0,side,default settings
+56,StandardScaler,XGBClassifier,0.7807408857626312,0.7807408857626312,0.7807408857626312,71509.0,vertical,default settings
+57,StandardScaler,CatBoostClassifier,0.845823602623446,0.845823602623446,0.845823602623446,71509.0,vertical,default settings
+58,StandardScaler,LGBMClassifier,0.8436001062803283,0.8436001062803283,0.8436001062803283,71509.0,vertical,default settings
+59,StandardScaler,XGBClassifier,0.5268802169992031,0.5268802169992031,0.5268802169992031,71521.0,side,default settings
+60,StandardScaler,CatBoostClassifier,0.7065477272409502,0.7065477272409502,0.7065477272409502,71521.0,side,default settings
+61,StandardScaler,LGBMClassifier,0.6969002111268019,0.6969002111268019,0.6969002111268019,71521.0,side,default settings
+62,StandardScaler,XGBClassifier,0.8648701562041141,0.8648701562041141,0.864870156204114,71509.0,vertical,default settings
+63,StandardScaler,CatBoostClassifier,0.8436001062803283,0.8436001062803283,0.8436001062803283,71509.0,vertical,default settings
+64,StandardScaler,LGBMClassifier,0.842789019563971,0.842789019563971,0.842789019563971,71509.0,vertical,default settings
+65,StandardScaler,XGBClassifier,0.5262370492582598,0.5262370492582598,0.5262370492582598,71521.0,side,n_estimators=1000
+66,StandardScaler,CatBoostClassifier,0.7054431565554173,0.7054431565554173,0.7054431565554173,71521.0,side,default settings
+67,StandardScaler,LGBMClassifier,0.6947050516631479,0.6947050516631479,0.6947050516631479,71521.0,side,default settings
+68,StandardScaler,XGBClassifier,0.5343745193719327,0.5343745193719327,0.5343745193719327,71521.0,side,n_estimators=500
+69,StandardScaler,CatBoostClassifier,0.71095202807567,0.71095202807567,0.71095202807567,71521.0,side,default settings
+70,StandardScaler,LGBMClassifier,0.7003956879797542,0.7003956879797542,0.7003956879797542,71521.0,side,default settings
+71,StandardScaler,XGBClassifier,0.5299981823520364,0.5299981823520364,0.5299981823520364,71521.0,side,n_estimators=500
+72,StandardScaler,CatBoostClassifier,0.705680848981418,0.705680848981418,0.705680848981418,71521.0,side,default settings
+73,StandardScaler,LGBMClassifier,0.6953062736818557,0.6953062736818557,0.6953062736818557,71521.0,side,default settings
+74,StandardScaler,CatBoostClassifier,0.6960193509598579,0.6960193509598579,0.6960193509598579,71521.0,side,default settings
+75,StandardScaler,CatBoostClassifier,0.6960193509598579,0.6960193509598579,0.6960193509598579,71521.0,side,"lr:1.2,iter:1000,depth:7"
+76,StandardScaler,CatBoostClassifier,0.6840228744005257,0.6840228744005257,0.6840228744005257,71521.0,side,"lr:1.2,iter:1000,depth:7"
+77,StandardScaler,CatBoostClassifier,0.6936144628850268,0.6936144628850268,0.6936144628850268,71521.0,side,"lr:0.05,iter:1000,depth:5"
+78,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,vertical,n_estim: 1000
+79,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,vertical,n_estim: 100
+80,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,default settings
+81,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,default settings
+82,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,side,n_estimators=500
+83,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,side,"lr:1.0,iter:500,depth:3"
+0,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,side,default settings
