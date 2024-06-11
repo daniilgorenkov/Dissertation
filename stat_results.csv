@@ -83,4 +83,27 @@
 81,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,default settings
 82,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,side,n_estimators=500
 83,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,side,"lr:1.0,iter:500,depth:3"
+84,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,side,default settings
+85,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,vertical,n_estim: 100
+86,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,vertical,n_estim: 100
+87,StandardScaler,XGBClassifier,1.0,1.0,1.0,71509.0,vertical,n_estim: 50
+88,StandardScaler,XGBClassifier,0.9950635584332044,0.9950635584332044,0.9950635584332044,71509.0,vertical,n_estim: 10
+89,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,iterations:10
+90,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,iterations:5
+91,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,"iterations:5,depth:1"
+92,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,"iterations:5,depth:1,lr:1"
+93,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,estims:10
+94,StandardScaler,XGBClassifier,0.9954551175376526,0.9954551175376526,0.9954551175376526,71509.0,vertical,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+95,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'CatBoostClassifier__iterations': 5, 'CatBoostClassifier__depth': 1, 'CatBoostClassifier__learning_rate': 1.0}"
+96,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'CatBoostClassifier__iterations': 2, 'CatBoostClassifier__depth': 1, 'CatBoostClassifier__learning_rate': 1.0}"
+97,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 5, 'LGBMClassifier__max_depth': 1, 'LGBMClassifier__learning_rate': 1.0}"
+98,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 5, 'LGBMClassifier__max_depth': 3, 'LGBMClassifier__learning_rate': 1.0}"
+99,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 5, 'LGBMClassifier__max_depth': 5, 'LGBMClassifier__learning_rate': 1.0}"
+100,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 1, 'LGBMClassifier__max_depth': 8, 'LGBMClassifier__learning_rate': 1.0}"
+101,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 10, 'LGBMClassifier__max_depth': 8, 'LGBMClassifier__learning_rate': 1.0}"
+102,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 10, 'LGBMClassifier__max_depth': 8, 'LGBMClassifier__learning_rate': 1.0, 'LGBMClassifier__num_leaves': 20}"
+103,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'CatBoostClassifier__iterations': 5, 'CatBoostClassifier__depth': 8, 'CatBoostClassifier__learning_rate': 1.0}"
+104,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 10, 'LGBMClassifier__max_depth': 8, 'LGBMClassifier__learning_rate': 1.0, 'LGBMClassifier__num_leaves': 20}"
+105,StandardScaler,XGBClassifier,0.9968115901494916,0.9968115901494916,0.9968115901494916,71509.0,side,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+106,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,side,"params: {'CatBoostClassifier__iterations': 5, 'CatBoostClassifier__depth': 8, 'CatBoostClassifier__learning_rate': 0.5}"
 0,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,side,default settings
