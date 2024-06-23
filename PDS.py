@@ -101,7 +101,9 @@ class PDS:
                              way_type:str,
                              fault:str,
                              speed:int,
-                             force:str ="vertical"):
+                             force:str ="vertical",
+                             xlim:tuple[int,int]=None,
+                             ylim:tuple[int,int]=None):
         """Создание графика сравнения результатов с разным профилем колес"""
         d={"loaded":"Груженый",
         "empty":"Порожний",
@@ -127,6 +129,10 @@ class PDS:
             plt.ylabel("Вертикальная сила, Н")
         elif force == "side":
             plt.ylabel("Боковая сила, Н")
+        
+        if xlim and ylim:
+            plt.xlim(xlim)
+            plt.ylim(ylim)
         plt.show()
     
 
