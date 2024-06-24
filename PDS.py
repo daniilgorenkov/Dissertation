@@ -10,7 +10,8 @@ import catboost
 import lightgbm
 import xgboost
 import sklearn
-
+from sklearn.metrics import classification_report
+import datetime
 
 class PDS:
     """Pretrained Diagnostic System"""
@@ -573,3 +574,22 @@ class PDS:
         
         elif "Unnamed: 0" not in columns:
             return data
+    
+    def pretty_save_estimator_result(estimator,X_test:pd.DataFrame,y_test:pd.Series):
+        """Сохранение результатов модели в виде таблицы для отчетов"""
+        
+        if type(estimator[1]) == xgboost.sklearn.XGBClassifier:
+            save_path = "/xgb_models_report"
+
+        elif type(estimator[1]) == lightgbm.sklearn.LGBMClassifier:
+            save_path = "/lgbm_models_report"
+        
+        elif type(estimator[1]) == catboost.core.CatBoostClassifier:
+            save_path = "/catboost_models_report"
+
+        else:
+            raise ValueError("Передан не бустинг!")
+
+        rep = classification_report(y_true=y_test,y_pred=estimator.predict(X_test),digits=6,output_dict=True)
+
+        pd.DataFrame(rep).T.to_excel(f"{save_path}/report_from_{datetime.datetime.now()}.excel")
