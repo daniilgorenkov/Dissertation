@@ -1,4 +1,5 @@
 import os
+from config import Paths
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,7 +19,7 @@ class PDS:
     """Pretrained Diagnostic System"""
 
     def get_result(
-        config: str,
+        wagon_config: str,
         way_type: str,
         fault: str,
         speed: int,
@@ -38,52 +39,30 @@ class PDS:
         }
 
         if force == "vertical":
-            if config == "empty":
-                PATH = "C:\\Users\\Daniil\\Desktop\\simulation_results\\Vertical force\\empty"
+            if wagon_config == "empty":
+                PATH = os.path.join(Paths.VERICAL_FORCE, "empty")
 
-            elif config == "loaded":
-                PATH = "C:\\Users\\Daniil\\Desktop\\simulation_results\\Vertical force\\loaded"
+            elif wagon_config == "loaded":
+                PATH = os.path.join(Paths.VERICAL_FORCE, "loaded")
 
         elif force == "side":
-            if config == "empty":
-                PATH = (
-                    "C:\\Users\\Daniil\\Desktop\\simulation_results\\Side force\\empty"
-                )
+            if wagon_config == "empty":
+                PATH = os.path.join(Paths.SIDE_FORCE, "empty")
 
-            elif config == "loaded":
-                PATH = (
-                    "C:\\Users\\Daniil\\Desktop\\simulation_results\\Side force\\loaded"
-                )
+            elif wagon_config == "loaded":
+                PATH = os.path.join(Paths.SIDE_FORCE, "loaded")
 
-        name = (
-            "\\"
-            + config
-            + "_"
-            + way_type
-            + "_"
-            + fault
-            + "_"
-            + str(speed)
-            + "_"
-            + profile
-            + ".csv"
-        )
+        fname = os.path.join(way_type, fault, str(speed), profile)
+        fname_ext = os.path.join(fname, ".csv")
+        FULL_PATH = os.path.join(PATH, fname_ext)
 
-        l_name = len(name)
-
-        FULL_PATH = PATH + name
-
-        print(name)
+        print(fname)
 
         file = pd.read_csv(FULL_PATH, encoding="latin-1")
-
-        COL_NAMES = ["time_step", name[1 : l_name - 4]]
-
+        COL_NAMES = ["time_step", fname]
         file.columns = COL_NAMES
-
         file = file.set_index("time_step")
-
-        if config == "curve_350":
+        if wagon_config == "curve_350":
             file = file[file.index < dictionary["curve_350"][speed]]
 
         return file
