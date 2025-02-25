@@ -1,5 +1,7 @@
 import os
-from config import Paths
+from re import S
+from typing import Generator
+from config import Paths, SimulationNames
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,125 +20,72 @@ import datetime
 class PDS:
     """Pretrained Diagnostic System"""
 
-    def get_result(
-        wagon_config: str,
-        way_type: str,
-        fault: str,
-        speed: int,
-        profile: str = "gost",
-        force: str = "vertical",
-    ) -> pd.DataFrame:
+    def __init__(self,force: str = "vertical"):
+        self.PROFILES = [SimulationNames.GREB_24, SimulationNames.GREB_26, SimulationNames.GREB_30, SimulationNames.GREB_GOST, SimulationNames.GREB_UM] # fmt:skip
+        self.WAY_TYPES = [SimulationNames.STRAIGHT, SimulationNames.CURVE_350, SimulationNames.CURVE_650] # fmt:skip
+        self.WAGON_CONFIGS = [SimulationNames.EMPTY, SimulationNames.LOADED] # fmt:skip
+        self.FAULTS = [SimulationNames.NO_FAULT, SimulationNames.POLZUN, SimulationNames.ELLIPS]
+        self.FORCE = force
+        self.plot_encoder = {
+                            "loaded": "Груженый",
+                            "empty": "Порожний",
+                            "straight": "прямая",
+                            "curve_350": "кривая 350 м",
+                            "curve_650": "кривая 650 м",
+                            "normal": "без неисправностей",
+                            "polzun15": "ползун",
+                            "ellips10": "неравномерный прокат",
+                            }
+
+    def get_result(self,
+                    wagon_config: str,
+                    way_type: str,
+                    fault: str,
+                    speed: int,
+                    profile: str = "gost",
+                   ) -> pd.DataFrame:
         """
-        Получение результатов расчетов по ключевым словам
-        1. `config` принимает два вида строк `empty` и `loaded`
-        2. `way_type` принимает три вида строк `straight`, `curve_350` и `curve_650`
-        3. `fault` принимает три вида строк `normal`, `polzun15`, `ellips10`
-        4. `speed` от 10 до 60 км/ч
-        5. `profile` есть профили `gost`, `newwagonw`, `greb_26`, `greb_30`, `greb_28`, `greb_24`
+        Result of the simulation
         """
-        dictionary = {
-            "curve_350": {20: 55, 30: 39, 40: 28, 50: 24, 60: 19},
-        }
 
-        if force == "vertical":
-            if wagon_config == "empty":
-                PATH = os.path.join(Paths.VERICAL_FORCE, "empty")
-
-            elif wagon_config == "loaded":
-                PATH = os.path.join(Paths.VERICAL_FORCE, "loaded")
-
-        elif force == "side":
-            if wagon_config == "empty":
-                PATH = os.path.join(Paths.SIDE_FORCE, "empty")
-
-            elif wagon_config == "loaded":
-                PATH = os.path.join(Paths.SIDE_FORCE, "loaded")
-
-        fname = os.path.join(way_type, fault, str(speed), profile)
-        fname_ext = os.path.join(fname, ".csv")
-        FULL_PATH = os.path.join(PATH, fname_ext)
-
-        print(fname)
+        fname = "_".join([wagon_config,way_type, fault, str(speed), profile])
+        fname_ext = fname + ".csv"
+        FULL_PATH = os.path.join(Paths.SIMULATION_RESULTS, self.FORCE, wagon_config,fname_ext)
 
         file = pd.read_csv(FULL_PATH, encoding="latin-1")
         COL_NAMES = ["time_step", fname]
         file.columns = COL_NAMES
-        file = file.set_index("time_step")
-        if wagon_config == "curve_350":
-            file = file[file.index < dictionary["curve_350"][speed]]
-
+        file.set_index("time_step",inplace=True)
         return file
 
-    def get_profile_results(
-        config: str, way_type: str, fault: str, speed: int, force: str = "vertical"
+    def get_profile_results(self,wagon_config: str, way_type: str, fault: str, speed: int) -> Generator:
+        """Simulation results by profiles"""
+        for profile in self.PROFILES:
+            yield self.get_result(wagon_config, way_type, fault, speed,profile)
+             
+    def plot_profile_results(self,
+                            wagon_config: str,
+                            way_type: str,
+                            fault: str,
+                            speed: int,
+                            xlim: tuple[int, int] = None,
+                            ylim: tuple[int, int] = None,
     ):
-        """Результаты расчета по всем видам профилей"""
+        """Plot simulation results by profiles"""
 
-        if force == "vertical":
-            file1 = PDS.get_result(config, way_type, fault, speed)
-            file2 = PDS.get_result(config, way_type, fault, speed, "greb_26")
-            file3 = PDS.get_result(config, way_type, fault, speed, "greb_28")
-            file4 = PDS.get_result(config, way_type, fault, speed, "greb_30")
-            file5 = PDS.get_result(config, way_type, fault, speed, "newwagonw")
-            file6 = PDS.get_result(config, way_type, fault, speed, "greb_24")
-
-        elif force == "side":
-            file1 = PDS.get_result(config, way_type, fault, speed, force="side")
-            file2 = PDS.get_result(
-                config, way_type, fault, speed, "greb_26", force="side"
-            )
-            file3 = PDS.get_result(
-                config, way_type, fault, speed, "greb_28", force="side"
-            )
-            file4 = PDS.get_result(
-                config, way_type, fault, speed, "greb_30", force="side"
-            )
-            file5 = PDS.get_result(
-                config, way_type, fault, speed, "newwagonw", force="side"
-            )
-            file6 = PDS.get_result(
-                config, way_type, fault, speed, "greb_24", force="side"
-            )
-
-        return file1, file2, file3, file4, file5, file6
-
-    def plot_profile_results(
-        config: str,
-        way_type: str,
-        fault: str,
-        speed: int,
-        force: str = "vertical",
-        xlim: tuple[int, int] = None,
-        ylim: tuple[int, int] = None,
-    ):
-        """Создание графика сравнения результатов с разным профилем колес"""
-        d = {
-            "loaded": "Груженый",
-            "empty": "Порожний",
-            "straight": "прямая",
-            "curve_350": "кривая 350 м",
-            "curve_650": "кривая 650 м",
-            "normal": "без неисправностей",
-            "polzun15": "ползун",
-            "ellips10": "неравномерный прокат",
-        }
-
-        #  sns.set (rc={' axes.facecolor':'#C0C0C0', 'figure.facecolor':'#FFFFF0 '})
-
-        files = PDS.get_profile_results(config, way_type, fault, speed, force=force)
+        files = self.get_profile_results(wagon_config, way_type, fault, speed)
         FILE = pd.concat(files, axis=1)
-        FILE.columns = ["gost", "greb_26", "greb_28", "greb_30", "newwagonw", "greb_24"]
-
+        FILE.columns = self.PROFILES
         plt.figure(figsize=(12, 8))
         plt.grid(True)
         sns.lineplot(FILE)
         plt.title(
-            f"{d[config]} вагон, {d[way_type]}, {d[fault]}, скорость {speed} км/ч "
+            f"{self.plot_encoder[wagon_config]} вагон, {self.plot_encoder[way_type]}, {self.plot_encoder[fault]}, скорость {speed} км/ч "
         )
         plt.xlabel("Время, с")
-        if force == "vertical":
+        if self.FORCE == "vertical":
             plt.ylabel("Вертикальная сила, Н")
-        elif force == "side":
+        elif self.FORCE == "side":
             plt.ylabel("Боковая сила, Н")
 
         if xlim and ylim:
