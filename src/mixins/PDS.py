@@ -1,7 +1,6 @@
 import os
-from re import S
 from typing import Generator
-from config import Paths, SimulationNames
+from config import Paths, SimulationNames, SimulationSpeeds
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,9 +8,8 @@ import seaborn as sns
 from IPython.display import clear_output
 from scipy.stats import skew, kurtosis
 from sklearn.metrics import precision_score, recall_score, f1_score
-import catboost
-import lightgbm
-import xgboost
+
+# import catboost
 import sklearn
 from sklearn.metrics import classification_report
 import datetime
@@ -20,56 +18,66 @@ import datetime
 class PDS:
     """Pretrained Diagnostic System"""
 
-    def __init__(self,force: str = "vertical"):
-        self.PROFILES = [SimulationNames.GREB_24, SimulationNames.GREB_26, SimulationNames.GREB_30, SimulationNames.GREB_GOST, SimulationNames.GREB_UM] # fmt:skip
-        self.WAY_TYPES = [SimulationNames.STRAIGHT, SimulationNames.CURVE_350, SimulationNames.CURVE_650] # fmt:skip
-        self.WAGON_CONFIGS = [SimulationNames.EMPTY, SimulationNames.LOADED] # fmt:skip
-        self.FAULTS = [SimulationNames.NO_FAULT, SimulationNames.POLZUN, SimulationNames.ELLIPS]
+    def __init__(self, force: str = "vertical"):
+        self.PROFILES = [SimulationNames.GREB_24, SimulationNames.GREB_26, SimulationNames.GREB_30, SimulationNames.GREB_GOST, SimulationNames.GREB_UM]  # fmt:skip
+        self.WAY_TYPES = [SimulationNames.STRAIGHT, SimulationNames.CURVE_350, SimulationNames.CURVE_650]  # fmt:skip
+        self.WAGON_CONFIGS = [SimulationNames.EMPTY, SimulationNames.LOADED]  # fmt:skip
+        self.FAULTS = [
+            SimulationNames.NO_FAULT,
+            SimulationNames.POLZUN,
+            SimulationNames.ELLIPS,
+        ]
         self.FORCE = force
         self.plot_encoder = {
-                            "loaded": "Груженый",
-                            "empty": "Порожний",
-                            "straight": "прямая",
-                            "curve_350": "кривая 350 м",
-                            "curve_650": "кривая 650 м",
-                            "normal": "без неисправностей",
-                            "polzun15": "ползун",
-                            "ellips10": "неравномерный прокат",
-                            }
+            "loaded": "Груженый",
+            "empty": "Порожний",
+            "straight": "прямая",
+            "curve_350": "кривая 350 м",
+            "curve_650": "кривая 650 м",
+            "normal": "без неисправностей",
+            "polzun15": "ползун",
+            "ellips10": "неравномерный прокат",
+        }
 
-    def get_result(self,
-                    wagon_config: str,
-                    way_type: str,
-                    fault: str,
-                    speed: int,
-                    profile: str = "gost",
-                   ) -> pd.DataFrame:
+    def get_result(
+        self,
+        wagon_config: str,
+        way_type: str,
+        fault: str,
+        speed: int,
+        profile: str = "gost",
+    ) -> pd.DataFrame:
         """
         Result of the simulation
         """
 
-        fname = "_".join([wagon_config,way_type, fault, str(speed), profile])
+        fname = "_".join([wagon_config, way_type, fault, str(speed), profile])
         fname_ext = fname + ".csv"
-        FULL_PATH = os.path.join(Paths.SIMULATION_RESULTS, self.FORCE, wagon_config,fname_ext)
+        FULL_PATH = os.path.join(
+            Paths.SIMULATION_RESULTS, self.FORCE, wagon_config, fname_ext
+        )
 
         file = pd.read_csv(FULL_PATH, encoding="latin-1")
         COL_NAMES = ["time_step", fname]
         file.columns = COL_NAMES
-        file.set_index("time_step",inplace=True)
+        file.set_index("time_step", inplace=True)
         return file
 
-    def get_profile_results(self,wagon_config: str, way_type: str, fault: str, speed: int) -> Generator:
+    def get_profile_results(
+        self, wagon_config: str, way_type: str, fault: str, speed: int
+    ) -> Generator:
         """Simulation results by profiles"""
         for profile in self.PROFILES:
-            yield self.get_result(wagon_config, way_type, fault, speed,profile)
-             
-    def plot_profile_results(self,
-                            wagon_config: str,
-                            way_type: str,
-                            fault: str,
-                            speed: int,
-                            xlim: tuple[int, int] = None,
-                            ylim: tuple[int, int] = None,
+            yield self.get_result(wagon_config, way_type, fault, speed, profile)
+
+    def plot_profile_results(
+        self,
+        wagon_config: str,
+        way_type: str,
+        fault: str,
+        speed: int,
+        xlim: tuple[int, int] = None,
+        ylim: tuple[int, int] = None,
     ):
         """Plot simulation results by profiles"""
 
@@ -94,61 +102,42 @@ class PDS:
         plt.show()
 
     def get_speed_results(
-        config: str,
+        self,
+        wagon_config: str,
         way_type: str,
         fault: str,
         profile: str = "gost",
-        force: str = "vertical",
-    ) -> list[pd.DataFrame]:
+    ) -> Generator:
         """Получение расчета сразу по всем скоростям"""
-        speed = [i for i in range(10, 130, 10)]
+        SPEED = (
+            SimulationSpeeds.STRAIGHT
+            if "straight" in way_type
+            else SimulationSpeeds.CURVE
+        )
 
-        results = []
+        for v in SPEED:
+            file = self.get_result(wagon_config, way_type, fault, v, profile)
+            yield file
 
-        for v in speed:
-            if "curve" in way_type and v > 80:
-                continue
-
-            if force == "vertical":
-                file = PDS.get_result(
-                    config, way_type, fault, profile=profile, speed=v, force=force
-                )
-                results.append(file)
-
-            elif force == "side":
-                file = PDS.get_result(
-                    config, way_type, fault, profile=profile, speed=v, force=force
-                )
-                results.append(file)
-
-        return results
-
-    def get_full_calculations(
-        wagon_cfg: list,
-        way_cfg: list,
-        wheel_cfg: list,
-        fault_cfg: list,
-        force: str = "vertical",
-    ) -> dict:
+    def get_full_calculations(self) -> dict:
         """Получение словаря со всеми расчетами"""
-        gen_dict = {}
+        simulation_results = {}
 
-        for wagon in wagon_cfg:
-            gen_dict[wagon] = {}
-            for way in way_cfg:
-                gen_dict[wagon][way] = {}
-                for fault in fault_cfg:
-                    gen_dict[wagon][way][fault] = {}
-                    for wheel in wheel_cfg:
+        for wagon in self.WAGON_CONFIGS:
+            simulation_results[wagon] = {}
+            for way in self.WAY_TYPES:
+                simulation_results[wagon][way] = {}
+                for fault in self.FAULTS:
+                    simulation_results[wagon][way][fault] = {}
+                    for wheel in self.PROFILES:
                         clear_output(True)
                         print(f"{wagon}\n{way}\n{fault}\n{wheel}\n------")
-                        gen_dict[wagon][way][fault][wheel] = PDS.get_speed_results(
-                            wagon, way, fault, wheel, force=force
-                        )
+                        all_speed_results = self.get_speed_results(wagon, way, fault, wheel)  # fmt:skip
+                        simulation_results[wagon][way][fault][wheel] = pd.concat([speed_result for speed_result in all_speed_results], axis=1)  # fmt:skip
 
-        return gen_dict
+        return simulation_results
 
-    def time_split(v: int) -> int:
+    def time_split(self, v: int) -> int:
         """Определение временного промежутка полного оборота колеса
         1. v - скорость движения поезда, км/ч
         """
@@ -157,7 +146,7 @@ class PDS:
         t = lenght / speed
         return t
 
-    def get_time_splits(data: pd.DataFrame) -> list:
+    def get_time_splits(self, data: pd.DataFrame) -> list:
         """Возвращает индексы по которым нужно производить обрез
         Индексы высчтитываются в зависимости от скорости движения вагона и радиуса колеса
         """
@@ -170,11 +159,13 @@ class PDS:
 
         if data.columns[0].split("_")[1] == "straight":
             col_name = data.columns[0].split("_")  # 10,20,30... км/ч
-            wheel_rotate_num = PDS.time_split(int(col_name[3]))  # 1.007 сек
+            speed = int(col_name[3])
+            wheel_rotate_num = self.time_split(speed)  # 1.007 сек
 
         elif data.columns[0].split("_")[1] == "curve":
             col_name = data.columns[0].split("_")  # 10,20,30... км/ч
-            wheel_rotate_num = PDS.time_split(int(col_name[4]))  # 1.007 сек
+            speed = int(col_name[4])
+            wheel_rotate_num = self.time_split(speed)  # 1.007 сек
 
         num_folds = (
             time_max_point - 1
@@ -188,11 +179,10 @@ class PDS:
 
         return res
 
-    def time_indexes(frames: list[pd.DataFrame]) -> dict:
+    def time_indexes(self, frames: list[pd.DataFrame]) -> dict:
         """Возвращает словарь индексов по которым нужно производить обрез, где
         индексы высчтитываются в зависимости от скорости движения вагона и радиуса колеса
         """
-
         res = {}
 
         for n in range(len(frames)):
@@ -201,40 +191,29 @@ class PDS:
                 if s.isdigit():  # тут нужно придумать исключение для толщины гребней
                     if int(s) != 350 and int(s) != 650 and int(s) != 24:
                         name = s
-
-                        res[name] = PDS.get_time_splits(frames[n])
-
+                        res[name] = self.get_time_splits(frames[n])
         return res
 
     def get_all_time_indexes(
+        self,
         calculations: dict[dict[dict[dict[list[pd.DataFrame]]]]],
     ) -> dict:
         """Получение всех индексов времени по которым надо делить расчеты в виде словаря"""
 
-        wagon_cfg = calculations.keys()
-        way_cfg = calculations["empty"].keys()
-        fault_cfg = calculations["empty"]["straight"].keys()
-        wheel_cfg = calculations["empty"]["straight"]["normal"].keys()
-
-        gen_dict = {}
-
-        for wagon in wagon_cfg:
-            gen_dict[wagon] = {}
-
-            for way in way_cfg:
-                gen_dict[wagon][way] = {}
-
-                for fault in fault_cfg:
-                    gen_dict[wagon][way][fault] = {}
-
-                    for wheel in wheel_cfg:
+        time_idxs = {}
+        for wagon in self.WAGON_CONFIGS:
+            time_idxs[wagon] = {}
+            for way in self.WAY_TYPES:
+                time_idxs[wagon][way] = {}
+                for fault in self.FAULTS:
+                    time_idxs[wagon][way][fault] = {}
+                    for wheel in self.PROFILES:
                         clear_output(True)
                         print(f"{wagon}\n{way}\n{fault}\n{wheel}\n------")
-                        gen_dict[wagon][way][fault][wheel] = PDS.time_indexes(
+                        time_idxs[wagon][way][fault][wheel] = self.time_indexes(
                             calculations[wagon][way][fault][wheel]
                         )
-
-        return gen_dict
+        return time_idxs
 
     def get_splitted_dataframe(data: pd.DataFrame, indexes: list) -> pd.DataFrame:
         """Разделение одного результата расчета на несколько других по полному обороту колеса

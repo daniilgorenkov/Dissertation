@@ -2,7 +2,7 @@ import os
 
 
 class Common:
-    SEED: int = 42
+    SEED: int = 101
 
 
 class Paths:
@@ -30,3 +30,7 @@ class SimulationNames:
     POLZUN = "polzun15"
     ELLIPS = "ellips10"
     NO_FAULT = "normal"
+
+class SimulationSpeeds:
+    STRAIGHT = [i for i in range(10, 130, 10)]
+    CURVE = [i for i in range(10, 90, 10)]
