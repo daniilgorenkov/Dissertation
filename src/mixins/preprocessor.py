@@ -82,7 +82,7 @@ class Preprocessor(FileOperator):
         Preprocess the results of a simulation file.
 
         :param filename: The name of the file to preprocess.
-        :return: A list of DataFrames containing the preprocessed data.
+        :return: A DataFrame containing the preprocessed data.
         """
         df = self.load_csv(filename)
         df = self._reset_column_names(df)
