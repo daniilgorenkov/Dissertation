@@ -13,6 +13,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 import sklearn
 from sklearn.metrics import classification_report
 import datetime
+from tqdm import tqdm
 
 
 class PDS:
@@ -38,6 +39,7 @@ class PDS:
             "polzun15": "ползун",
             "ellips10": "неравномерный прокат",
         }
+        self.total_iterations = len(self.WAGON_CONFIGS) * len(self.WAY_TYPES) * len(self.FAULTS) * len(self.PROFILES)  # fmt:skip
 
     def get_result(
         self,
@@ -109,31 +111,31 @@ class PDS:
         profile: str = "gost",
     ) -> Generator:
         """Получение расчета сразу по всем скоростям"""
-        SPEED = (
+        self.SPEED = (
             SimulationSpeeds.STRAIGHT
             if "straight" in way_type
             else SimulationSpeeds.CURVE
         )
 
-        for v in SPEED:
+        for v in self.SPEED:
             file = self.get_result(wagon_config, way_type, fault, v, profile)
             yield file
 
-    def get_full_calculations(self) -> dict:
+    def get_full_calculations(self) -> pd.DataFrame:
         """Получение словаря со всеми расчетами"""
         simulation_results = {}
 
-        for wagon in self.WAGON_CONFIGS:
-            simulation_results[wagon] = {}
-            for way in self.WAY_TYPES:
-                simulation_results[wagon][way] = {}
-                for fault in self.FAULTS:
-                    simulation_results[wagon][way][fault] = {}
-                    for wheel in self.PROFILES:
-                        clear_output(True)
-                        print(f"{wagon}\n{way}\n{fault}\n{wheel}\n------")
-                        all_speed_results = self.get_speed_results(wagon, way, fault, wheel)  # fmt:skip
-                        simulation_results[wagon][way][fault][wheel] = pd.concat([speed_result for speed_result in all_speed_results], axis=1)  # fmt:skip
+        with tqdm(total=self.total_iterations) as pbar:
+            for wagon in self.WAGON_CONFIGS:
+                simulation_results[wagon] = {}
+                for way in self.WAY_TYPES:
+                    simulation_results[wagon][way] = {}
+                    for fault in self.FAULTS:
+                        simulation_results[wagon][way][fault] = {}
+                        for wheel in self.PROFILES:
+                            all_speed_results = self.get_speed_results(wagon, way, fault, wheel)  # fmt:skip
+                            simulation_results[wagon][way][fault][wheel] = pd.concat([speed_result for speed_result in all_speed_results], axis=1)  # fmt:skip
+                            pbar.update(1)
 
         return simulation_results
 
@@ -186,7 +188,9 @@ class PDS:
         res = {}
 
         for n in range(len(frames)):
+            print("about to get key 0")
             str = frames[n].columns[0].split("_")
+            print("got key 0")
             for s in str:
                 if s.isdigit():  # тут нужно придумать исключение для толщины гребней
                     if int(s) != 350 and int(s) != 650 and int(s) != 24:
@@ -208,41 +212,28 @@ class PDS:
                 for fault in self.FAULTS:
                     time_idxs[wagon][way][fault] = {}
                     for wheel in self.PROFILES:
-                        clear_output(True)
-                        print(f"{wagon}\n{way}\n{fault}\n{wheel}\n------")
+                        print(
+                            f"Calculating time indexes for {wagon}, {way}, {fault}, {wheel}"
+                        )
                         time_idxs[wagon][way][fault][wheel] = self.time_indexes(
                             calculations[wagon][way][fault][wheel]
                         )
         return time_idxs
 
-    def get_splitted_dataframe(data: pd.DataFrame, indexes: list) -> pd.DataFrame:
+    def get_splitted_dataframe(self, data: pd.DataFrame, indexes: list) -> pd.DataFrame:
         """Разделение одного результата расчета на несколько других по полному обороту колеса
         1. `data` - датафрейм с расчетом
         2. `indexes` - индексы по которым нужно делить расчет"""
 
-        zeros = np.zeros((214, 1))
-        common_df = pd.DataFrame(zeros)
+        slices = [data.loc[indexes[i]:indexes[i + 1]] if i < len(indexes) - 1 else data.loc[indexes[i]:] for i in range(len(indexes))]  # fmt:skip
+        common_df = pd.concat(slices, axis=1)
 
-        for i in range(len(indexes)):
-            if i < len(indexes) - 1:
-                seq = data[
-                    (data.index >= indexes[i]) & (data.index <= indexes[i + 1])
-                ]  # срез по точкам
-            else:
-                seq = data[data.index > indexes[i]]
-            common_df = pd.concat([common_df, seq], axis=1)
+        num_cols = len(common_df.columns)
+        common_df.columns = pd.MultiIndex.from_tuples([(data.columns[0], i) for i in range(num_cols)])  # fmt:skip
 
-        df = common_df.drop(0, axis=1)
-        num_cols = len(df.columns)
+        return common_df
 
-        df.columns = [
-            [data.columns[0] for i in range(num_cols)],
-            [i for i in range(num_cols)],
-        ]
-
-        return df
-
-    def get_skew_kurt(data: pd.DataFrame) -> pd.DataFrame:
+    def get_skew_kurt(self, data: pd.DataFrame) -> pd.DataFrame:
         """Получение дополнительных фичей для расчетов"""
 
         cols = data.columns
@@ -258,57 +249,53 @@ class PDS:
 
         return pd.DataFrame({"skew": skews, "kurt": kurtosises}, index=cols).T
 
-    def get_description(data: pd.DataFrame) -> pd.DataFrame:
+    def get_description(self, data: pd.DataFrame) -> pd.DataFrame:
         """Получаем описанный фрейм и к нему добавляем доп фичи"""
 
-        summ = data.sum()
+        summary = data.sum()
         variance = data.var()
-        skew_kurt = PDS.get_skew_kurt(data)
+        skew_kurt = self.get_skew_kurt(data)
         desc = data.describe()
 
-        summ_var = pd.concat([variance, summ], axis=1).T
-        summ_var.index = ["var", "sum"]
+        summary_variance = pd.concat([variance, summary], axis=1).T
+        summary_variance.index = ["var", "sum"]
 
-        df = pd.concat([desc, summ_var, skew_kurt], axis=0)
+        df = pd.concat([desc, summary_variance, skew_kurt], axis=0)
         return df
 
-    def make_frame_from_splits(calculations: dict, time_indexes: dict) -> pd.DataFrame:
-        """Объединение всех разделенных расчетов на фолды и создание фичей"""
+    def gen_all_data(self) -> pd.DataFrame:
+        """
+        Generates a DataFrame by iterating through various configurations of wagons, ways, faults, and wheel profiles,
+        and concatenating the results of calculations and their descriptions.
+        Returns:
+            pd.DataFrame: A DataFrame containing the concatenated results of the calculations and their descriptions.
+        """
 
-        wagon_cfg = calculations.keys()
-        way_cfg = calculations["empty"].keys()
-        fault_cfg = calculations["empty"]["straight"].keys()
-        wheel_cfg = calculations["empty"]["straight"]["normal"].keys()
-        speed_cfg = time_indexes["empty"]["straight"]["normal"]["gost"].keys()
-        lenght = len(calculations["empty"]["straight"]["normal"]["gost"])
+        simulation_reults = self.get_full_calculations()
+        time_indexes = self.get_all_time_indexes(simulation_reults)
+
+        lenght = len(simulation_reults.columns)
 
         zeros = np.zeros((1, 12))
         common_df = pd.DataFrame(zeros)
 
-        n = 0
+        with tqdm(total=self.total_iterations * len(self.SPEED)) as pbar:
+            for wagon in self.WAGON_CONFIGS:
+                for way in self.WAY_TYPES:
+                    for fault in self.FAULTS:
+                        for wheel in self.PROFILES:
+                            for l, speed in zip(range(lenght), self.SPEED):
 
-        for wagon in wagon_cfg:
-            for way in way_cfg:
-                for fault in fault_cfg:
-                    for wheel in wheel_cfg:
-                        for l, speed in zip(range(lenght), speed_cfg):
+                                splitted_df = self.get_splitted_dataframe(
+                                    simulation_reults[wagon][way][fault][wheel][l],
+                                    time_indexes[wagon][way][fault][wheel][speed],
+                                )
 
-                            if "curve" in way:
-                                if l > 7 and int(speed) > 80:
-                                    continue
+                                feats = self.get_description(splitted_df)
 
-                            splitted_df = PDS.get_splitted_dataframe(
-                                calculations[wagon][way][fault][wheel][l],
-                                time_indexes[wagon][way][fault][wheel][speed],
-                            )
+                                common_df = pd.concat([common_df, feats], axis=1)
 
-                            feats = PDS.get_description(splitted_df)
-
-                            common_df = pd.concat([common_df, feats], axis=1)
-
-                            clear_output(wait=True)
-                            print(f"Сделано: {n}")
-                            n += 1
+                                pbar.update(1)
 
         df = common_df.drop(0, axis=0).drop(0, axis=1)
 

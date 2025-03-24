@@ -7,11 +7,8 @@ class Common:
 
 class Paths:
 
-    WORKDIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.getcwd()))))  # /mnt/c/Users/Daniil/Documents # fmt:skip
-    DESKTOP = os.path.join(WORKDIR, "Desktop")
-    SIMULATION_RESULTS = os.path.join(DESKTOP, "simulation_results")
-    VERICAL_FORCE = os.path.join(SIMULATION_RESULTS, "vertical_force")
-    SIDE_FORCE = os.path.join(SIMULATION_RESULTS, "side_force")
+    WORKDIR = os.path.dirname(os.path.dirname(os.getcwd()))  # Dissertation # fmt:skip
+    DATA = os.path.join(WORKDIR, "data")
 
 
 class SimulationNames:
@@ -31,6 +28,18 @@ class SimulationNames:
     ELLIPS = "ellips10"
     NO_FAULT = "normal"
 
+
 class SimulationSpeeds:
     STRAIGHT = [i for i in range(10, 130, 10)]
     CURVE = [i for i in range(10, 90, 10)]
+
+
+class Preprocessor:
+    BAD_CHARS = [
+        "XÂðåìÿ (ñåê) (Âðåìÿ  ñåê)Q(V)_1l ",
+        "- [Ýêñïåðèìåíò: ",
+        "]  (Q(V)_1l)",
+        "Âðåìÿ (ñåê) (Âðåìÿ  ñåê)Q(V)_1l ",
+        "v0=",
+    ]
+    IGNORE_COLUMNS = ["Unnamed: 24", "Unnamed: 16"]
