@@ -508,52 +508,58 @@ class PDS:
         return updated_stats
     
 
-    def plot_feature_importance(estimator):
-        
-        if type(estimator[1]) == xgboost.sklearn.XGBClassifier:
+    def plot_feature_importance(estimator, column_names=None, font_size=12, profile:bool=False) -> None:
+        if isinstance(estimator[1], xgboost.sklearn.XGBClassifier):
             coefs = estimator[1].coef_
-
-        elif type(estimator[1]) == catboost.core.CatBoostClassifier or lightgbm.sklearn.LGBMClassifier:
+        elif isinstance(estimator[1], (catboost.core.CatBoostClassifier, lightgbm.sklearn.LGBMClassifier)):
             coefs = estimator[1].feature_importances_
-
-        elif type(estimator[1]) == sklearn.linear_model._coordinate_descent.Lasso:
+        elif isinstance(estimator[1], sklearn.linear_model._coordinate_descent.Lasso):
             coefs = estimator[1].coef_
-            
+
         if coefs.shape[0] == 3:
-            d = {0:"исправного колеса",
-                1:"ползуна",
-                2:"неравномерного проката"}
-            
+            if not profile:
+                d = {0: "исправного колеса", 1: "ползуна", 2: "неравномерного проката"}
+            else:
+                d = {0: "исправного гребня", 1: "средне изношенного гребня", 2: "сильноизношенного гребня"}
         elif coefs.shape[0] == 2:
-            d = {0:"исправного вагона",
-                1:"неисправного вагона"}
-        
+            d = {0: "исправного вагона", 1: "неисправного вагона"}
         elif len(coefs.shape) == 1:
-            d = {0:"модели Catboost"}
-        
+            d = {0: "модели Catboost"}
+
+        if column_names is None:
+            column_names = estimator[:-1].get_feature_names_out()
+
+        fig_width = max(10, len(column_names) * 0.5)  # Ajusta dinámicamente el ancho
+
         if len(coefs) <= 3:
             for i in range(len(coefs)):
                 df = pd.DataFrame(coefs[i]).T
-                df.columns = estimator[:-1].get_feature_names_out()
+                df.columns = column_names
                 df.index = ["Степень важности"]
-                plt.figure().set_size_inches(12,2)
-                plt.title(f"Коэффициенты важности признаков для предсказания {d[i]}")
-                sns.barplot(abs(df))
-                plt.xticks(rotation=45)
+
+                plt.figure(figsize=(fig_width, 8))  
+                plt.title(f"Коэффициенты важности признаков для предсказания {d[i]}", fontsize=font_size)
+                sns.barplot(data=abs(df))
+                plt.xticks(rotation=45, ha='right', fontsize=font_size)  # Rotar nombres
+                plt.yticks(fontsize=font_size)
+                plt.tight_layout()  # Ajuste automático
+                plt.savefig(f"/mnt/c/Users/Daniil/Documents/GitHub/Dissertation/data/feature_importance_{d[i]}.png", dpi=1200)
                 plt.show()
-            
+                
         elif len(coefs.shape) == 1:
             df = pd.DataFrame(coefs).T
-            df.columns = estimator[:-1].get_feature_names_out()
+            df.columns = column_names
             df.index = ["Степень важности"]
-            plt.figure().set_size_inches(12,2)
-            plt.title(f"Коэффициенты важности признаков для предсказания неисправностей {d[0]}")
-            sns.barplot(abs(df))
-            plt.xticks(rotation=45)
+
+            plt.figure(figsize=(fig_width, 8))
+            plt.title(f"Коэффициенты важности признаков для предсказания неисправностей {d[0]}", fontsize=font_size)
+            sns.barplot(data=abs(df))
+            plt.xticks(rotation=45, ha='right', fontsize=font_size)
+            plt.yticks(fontsize=font_size)
+            plt.tight_layout()
+            plt.savefig(f"/mnt/c/Users/Daniil/Documents/GitHub/Dissertation/data/feature_importance_{d[0]}.png", dpi=1200)
             plt.show()
 
-        else:
-            print(len(coefs))
 
 
     def show_stat_results() -> pd.DataFrame:

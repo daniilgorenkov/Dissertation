@@ -106,4 +106,13 @@
 104,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,vertical,"params: {'LGBMClassifier__n_estimators': 10, 'LGBMClassifier__max_depth': 8, 'LGBMClassifier__learning_rate': 1.0, 'LGBMClassifier__num_leaves': 20}"
 105,StandardScaler,XGBClassifier,0.9968115901494916,0.9968115901494916,0.9968115901494916,71509.0,side,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
 106,StandardScaler,CatBoostClassifier,1.0,1.0,1.0,71509.0,side,"params: {'CatBoostClassifier__iterations': 5, 'CatBoostClassifier__depth': 8, 'CatBoostClassifier__learning_rate': 0.5}"
-0,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,side,default settings
+107,StandardScaler,LGBMClassifier,1.0,1.0,1.0,71509.0,side,default settings
+108,StandardScaler,XGBClassifier,0.9956508970898768,0.9956508970898768,0.9956508970898768,71509.0,vertical,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+109,StandardScaler,XGBClassifier,0.9968535429106826,0.9968535429106826,0.9968535429106826,71509.0,side,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+110,StandardScaler,XGBClassifier,0.9952593379854284,0.9952593379854284,0.9952593379854284,71509.0,vertical,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+111,StandardScaler,XGBClassifier,0.994965668657092,0.994965668657092,0.994965668657092,71509.0,vertical,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+112,StandardScaler,XGBClassifier,0.9959725349256736,0.9959725349256736,0.9959725349256736,71509.0,vertical,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+113,StandardScaler,XGBClassifier,0.9956928498510677,0.9956928498510677,0.9956928498510677,71509.0,vertical,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+114,StandardScaler,XGBClassifier,0.996643779104728,0.996643779104728,0.996643779104728,71509.0,side,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+115,StandardScaler,XGBClassifier,0.9955110545525738,0.9955110545525738,0.9955110545525738,71509.0,vertical,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
+0,StandardScaler,XGBClassifier,0.9967137003733796,0.9967137003733796,0.9967137003733796,71509.0,side,"params: {'XGBClassifier__n_estimators': 10, 'XGBClassifier__booster': 'gblinear'}"
