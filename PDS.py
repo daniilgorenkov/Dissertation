@@ -540,7 +540,7 @@ class PDS:
                 plt.figure(figsize=(fig_width, 8))  
                 plt.title(f"Коэффициенты важности признаков для предсказания {d[i]}", fontsize=font_size)
                 sns.barplot(data=abs(df))
-                plt.xticks(rotation=45, ha='right', fontsize=font_size)  # Rotar nombres
+                plt.xticks(rotation=90, ha='right', fontsize=font_size)  # Rotar nombres
                 plt.yticks(fontsize=font_size)
                 plt.tight_layout()  # Ajuste automático
                 plt.savefig(f"/mnt/c/Users/Daniil/Documents/GitHub/Dissertation/data/feature_importance_{d[i]}.png", dpi=1200)
@@ -554,7 +554,7 @@ class PDS:
             plt.figure(figsize=(fig_width, 8))
             plt.title(f"Коэффициенты важности признаков для предсказания неисправностей {d[0]}", fontsize=font_size)
             sns.barplot(data=abs(df))
-            plt.xticks(rotation=45, ha='right', fontsize=font_size)
+            plt.xticks(rotation=90, ha='right', fontsize=font_size)
             plt.yticks(fontsize=font_size)
             plt.tight_layout()
             plt.savefig(f"/mnt/c/Users/Daniil/Documents/GitHub/Dissertation/data/feature_importance_{d[0]}.png", dpi=1200)
