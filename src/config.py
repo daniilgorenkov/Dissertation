@@ -10,6 +10,8 @@ class Paths:
     WORKDIR = os.path.dirname(os.path.dirname(os.getcwd()))  # Dissertation # fmt:skip
     DATA = os.path.join(WORKDIR, "data")
 
+class WagonParams:
+    WHEEL_RADIUS = 0.475  # m
 
 class SimulationNames:
     FORCE_VERTICAL = "vertical"
