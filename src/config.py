@@ -7,8 +7,9 @@ class Common:
 
 class Paths:
 
-    WORKDIR = os.path.dirname(os.path.dirname(os.getcwd()))  # Dissertation # fmt:skip
-    DATA = os.path.join(WORKDIR, "data")
+    WORKDIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Dissertation # fmt:skip
+    _DATA = os.path.join(WORKDIR, "data")
+    _LOGS = os.path.join(WORKDIR, "logs")
 
 class WagonParams:
     WHEEL_RADIUS = 0.475  # m
@@ -45,3 +46,5 @@ class Preprocessor:
         "v0=",
     ]
     IGNORE_COLUMNS = ["Unnamed: 24", "Unnamed: 16"]
+
+    # FORCE

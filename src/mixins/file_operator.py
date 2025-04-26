@@ -6,7 +6,8 @@ import pickle
 
 class FileOperator:
     def __init__(self):
-        self.SAVE_PATH = config.Paths.DATA
+        self.SAVE_PATH = config.Paths._DATA
+        self._ensure_directories()
 
     def save(self, obj, filename: str):
         """
@@ -39,3 +40,14 @@ class FileOperator:
         """
         filepath = os.path.join(self.SAVE_PATH, filename + ".csv")
         return pd.read_csv(filepath, encoding="latin-1")
+    
+    def _ensure_directories(self):
+        """
+        Ensure that the directories in the given path exist.
+
+        :param path: The path to check and create directories for.
+        """
+        attrs = [attr for attr in config.Paths().__dir__() if attr.startswith("_") and not attr.startswith('__')]
+        dirs = [config.Paths().__getattribute__(attr) for attr in attrs]
+        for directory in dirs:
+            os.makedirs(directory,exist_ok=True)

@@ -1,17 +1,20 @@
 import config
 import os
 import pandas as pd
-import numpy as np
 from mixins.file_operator import FileOperator
 from tqdm import tqdm 
-from scipy.signal import find_peaks
 from scipy.fft import fft
+import numpy as np
+from scipy.signal import find_peaks
+from loguru import logger
+
+logger.add(os.path.join(config.Paths._LOGS, "pipeline.log"), rotation="10 MB", level="DEBUG", enqueue=True, backtrace=True, diagnose=True)
+logger.remove(0)  # Remove the default logger to prevent logs from being printed to the terminal
 
 class Preprocessor(FileOperator):
     def __init__(self):
         super().__init__()
         self.functions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__")]
-        # self.pbar = tqdm(total=len(self.functions), desc="Preprocessing")
 
     def _reset_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -28,7 +31,6 @@ class Preprocessor(FileOperator):
                 self.new_cols.append(col)
         self.new_cols.insert(0, "time_step")
         df.columns = self.new_cols
-        # self.pbar.update(1)
         return df
 
     def _get_split_index(self, df: pd.DataFrame) -> list:
@@ -41,8 +43,48 @@ class Preprocessor(FileOperator):
         idxs = df[df["time_step"].diff() < -10].index.tolist()
         idxs.insert(0, 0)
         idxs.append(df.shape[0])
-        # self.pbar.update(1)
         return idxs
+    
+    def _split_data(self, df: pd.DataFrame, idxs: list):
+        """
+        Splits the given DataFrame into smaller DataFrames based on the provided indices.
+        Args:
+            df (pd.DataFrame): The DataFrame to be split.
+            idxs (list): A list of indices defining the start and end points for each split.
+        Returns:
+            list: A list of DataFrames containing the split data.
+        """
+        sim_results = []
+        for idx in range(len(idxs) - 1):
+            start = idxs[idx]
+            end = idxs[idx + 1]
+            sim_results.append(df.iloc[start:end].iloc[:, :2])
+        logger.debug(f"total simulation results: {len(sim_results)}")
+        return sim_results
+    
+    def rename_duplicated_columns(self,df:pd.DataFrame) -> pd.DataFrame:
+        counts = {}
+        new_cols = []
+        for col in df.columns:
+            if col in counts:
+                counts[col] += 1
+                new_cols.append(f"{col}_{counts[col]}")
+            else:
+                counts[col] = 0
+                new_cols.append(col)
+        df.columns = new_cols
+        return df
+    
+    def _set_index(self, dfs: list[pd.DataFrame]) -> list:
+        """
+        Set the index of the DataFrames in the given list to the time_step column.
+
+        :param dfs: The list of DataFrames to set the index of.
+        :return: The list of DataFrames with the index set.
+        """
+        for df in dfs:
+            df.set_index("time_step", inplace=True)
+ 
     
     def _wheel_rotation_time(self, df: pd.DataFrame) -> np.ndarray:
         speed = float(df.columns[0].split(" ")[1])
@@ -51,7 +93,7 @@ class Preprocessor(FileOperator):
         max_indx = df.index.max()
         n_slices = int(max_indx//t)
         indexes = np.linspace(0, max_indx, n_slices)
-        # self.pbar.update(1)
+ 
         return indexes
     
     def split_df_by_time_indices(self,df:pd.DataFrame) -> pd.DataFrame:
@@ -71,29 +113,11 @@ class Preprocessor(FileOperator):
             new_index = np.arange(0, n * step, step)[:n]
             seg.index = new_index
             segments[i] = seg
-        # self.pbar.update(1)
+
+        if len(segments) <= 1:
+            logger.debug(f"Only one or less segment found!")
         return pd.concat(segments,axis=1)
-
-    def _split_data(self, df: pd.DataFrame, idxs: list):
-        """
-        Splits the given DataFrame into smaller DataFrames based on the provided indices.
-        Args:
-            df (pd.DataFrame): The DataFrame to be split.
-            idxs (list): A list of indices defining the start and end points for each split.
-        Returns:
-            list: A list of DataFrames containing the split data.
-        """
-        sim_results = []
-
-        for idx in range(len(idxs) - 1):
-            start = idxs[idx]
-            end = idxs[idx + 1]
-            sim_results.append(df.iloc[start:end].iloc[:, :2])
-
-        print(f"total simulation results: {len(sim_results)}")
-        # self.pbar.update(1)
-        return sim_results
-
+    
     def _rename_columns(self, dfs: list[pd.DataFrame]) -> list:
         """
         Rename the columns of the DataFrames in the given list.
@@ -103,20 +127,7 @@ class Preprocessor(FileOperator):
         """
         for df, col in zip(dfs, self.new_cols[1:]):
             df.columns = ["time_step", col]
-        # self.pbar.update(1)
-        
-
-    def _set_index(self, dfs: list[pd.DataFrame]) -> list:
-        """
-        Set the index of the DataFrames in the given list to the time_step column.
-
-        :param dfs: The list of DataFrames to set the index of.
-        :return: The list of DataFrames with the index set.
-        """
-        for df in dfs:
-            df.set_index("time_step", inplace=True)
-        # self.pbar.update(1)
-
+ 
     def compute_statistical_features(self,df:pd.DataFrame) -> dict:
         stats = {}
         for col in df.columns:
@@ -138,9 +149,6 @@ class Preprocessor(FileOperator):
         return stats
 
     def compute_temporal_features(self,df):
-        import numpy as np
-        from scipy.signal import find_peaks
-
         temp_feats = {}
         for col in df.columns:
             raw_series = df[col]
@@ -210,7 +218,6 @@ class Preprocessor(FileOperator):
 
     def extract_features_from_force_df(self,df:pd.DataFrame) -> pd.DataFrame:
         features = {}
-
         stats = self.compute_statistical_features(df)
         temp = self.compute_temporal_features(df)
         freq = self.compute_frequency_features(df)
@@ -221,21 +228,7 @@ class Preprocessor(FileOperator):
                 **temp[col],
                 **freq[col]
             }
-
-        return pd.DataFrame(features).T  # return as a nice DataFrame
-    
-    def rename_duplicated_columns(self,df:pd.DataFrame) -> pd.DataFrame:
-        counts = {}
-        new_cols = []
-        for col in df.columns:
-            if col in counts:
-                counts[col] += 1
-                new_cols.append(f"{col}_{counts[col]}")
-            else:
-                counts[col] = 0
-                new_cols.append(col)
-        df.columns = new_cols
-        return df
+        return pd.DataFrame(features).T  # return as a nice DataFrame  
 
 
     def preprocess_file_results(self, filename: str) -> pd.DataFrame:
@@ -251,11 +244,27 @@ class Preprocessor(FileOperator):
         dfs = self._split_data(df, idxs)
         self._rename_columns(dfs)
         self._set_index(dfs)
+        logger.debug(f"start extract features")
         for i in range(len(dfs)):
             dfs[i] = self.split_df_by_time_indices(dfs[i])
             dfs[i] = self.rename_duplicated_columns(dfs[i])
             dfs[i] = self.extract_features_from_force_df(dfs[i])
-        # self.pbar.update(1)
         return dfs
     
+    def preprocess_all(self,filenames: list[str]) -> dict:
+        """"
+        
+        Preprocess all simulation files in the given list.
+        Args:
+            filenames (list[str]): A list of file names to preprocess.
+            Returns:
+            DataFrame: A DataFrame containing the preprocessed data from all files."""
+        n_files = len(filenames)
+        dfs = []
+        for filename in tqdm(filenames, desc="Preprocessing files", total=n_files):
+                df = self.preprocess_file_results(filename)
+                dfs.append(df)
+        return pd.concat(dfs, axis=0)
+
+
     
