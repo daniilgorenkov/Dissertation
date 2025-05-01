@@ -1,4 +1,6 @@
 import config
+from config import SimulationNames
+from sklearn.model_selection import train_test_split
 import os
 import pandas as pd
 from mixins.file_operator import FileOperator
@@ -84,10 +86,29 @@ class Preprocessor(FileOperator):
         """
         for df in dfs:
             df.set_index("time_step", inplace=True)
- 
+            
+    def _clean_direction_data(self,data_list:list):
+        valid_directions = {"Vertical", "Side"}
+        
+        direction = next((item for item in data_list if item in valid_directions), None)
+        
+        number = None
+        for item in data_list:
+            cleaned = ''.join(c for c in item if c.isdigit() or c in '.-')
+            if cleaned.replace('.', '').isdigit():  
+                number = cleaned
+                break
+        
+        if direction and number:
+            return [direction, number]
+        
+        raise ValueError(f"Struggle with list: {data_list}")
+
     
     def _wheel_rotation_time(self, df: pd.DataFrame) -> np.ndarray:
-        speed = float(df.columns[0].split(" ")[1])
+        raw_name = df.columns[0].split(" ")
+        prep_name = self._clean_direction_data(raw_name)
+        speed = float(prep_name[1])
         lenght = 2 * np.pi * config.WagonParams.WHEEL_RADIUS
         t = lenght / speed
         max_indx = df.index.max()
@@ -96,27 +117,40 @@ class Preprocessor(FileOperator):
  
         return indexes
     
-    def split_df_by_time_indices(self,df:pd.DataFrame) -> pd.DataFrame:
+    def split_df_by_time_indices(self, df: pd.DataFrame) -> pd.DataFrame:
         indices = self._wheel_rotation_time(df)
         
         segments = []
         for i in range(len(indices) - 1):
             start = indices[i]
             end = indices[i + 1]
-            segment = df.loc[start:end]
-            segments.append(segment)
+            
+            # Boolean mask approach for floating-point indices
+            mask = (df.index >= start) & (df.index <= end)
+            segment = df.loc[mask].copy()
+            
+            # Only process if we actually got a segment
+            if not segment.empty:
+                segments.append(segment)
         
+        # Reindex each segment with floating-point timestamps
         for i, seg in enumerate(segments):
             n = len(seg)
-            # calcular paso promedio (asumiendo time_step constante)
-            step = seg.index.to_series().diff().median()
-            new_index = np.arange(0, n * step, step)[:n]
-            seg.index = new_index
+            if n > 1:
+                # Calculate median time step (as float)
+                time_steps = seg.index.to_series().diff().dropna()
+                step = float(time_steps.median()) if not time_steps.empty else 0.0
+                
+                # Create new floating-point index
+                new_index = np.arange(0.0, n * step, step, dtype=float)[:n]
+                seg.index = new_index
+            
             segments[i] = seg
 
         if len(segments) <= 1:
-            logger.debug(f"Only one or less segment found!")
-        return pd.concat(segments,axis=1)
+            logger.debug("Only one or less segment found!")
+        
+        return pd.concat(segments, axis=1) if segments else pd.DataFrame()
     
     def _rename_columns(self, dfs: list[pd.DataFrame]) -> list:
         """
@@ -249,11 +283,10 @@ class Preprocessor(FileOperator):
             dfs[i] = self.split_df_by_time_indices(dfs[i])
             dfs[i] = self.rename_duplicated_columns(dfs[i])
             dfs[i] = self.extract_features_from_force_df(dfs[i])
-        return dfs
+        return pd.concat(dfs,axis=0)
     
     def preprocess_all(self,filenames: list[str]) -> dict:
         """"
-        
         Preprocess all simulation files in the given list.
         Args:
             filenames (list[str]): A list of file names to preprocess.
@@ -262,9 +295,28 @@ class Preprocessor(FileOperator):
         n_files = len(filenames)
         dfs = []
         for filename in tqdm(filenames, desc="Preprocessing files", total=n_files):
+                target = 1 if SimulationNames.ELLIPS in filename.split("/") or SimulationNames.POLZUN in filename.split("/") else 0
                 df = self.preprocess_file_results(filename)
+                df["target"] = target
                 dfs.append(df)
-        return pd.concat(dfs, axis=0)
+        if len(dfs) > 1:
+            df = pd.concat(dfs, axis=0)
+        else:
+            df = dfs[0]
+
+        df.replace({0.0:config.Preprocessor.ZERO}, inplace=True)
+        df = df.astype(config.Preprocessor.DTYPES_OUT)
+        # Check for intersection between test and dev samples
+        train,test = train_test_split(df, test_size=config.Trainer.TEST_SIZE, random_state=config.Trainer.RANDOM_STATE, stratify=df["target"])
+        assert train.index.intersection(test.index).empty, "Train and test samples have intersection"
+        dev,test = train_test_split(test, test_size=config.Trainer.VALIDATION_SIZE, random_state=config.Trainer.RANDOM_STATE, stratify=test["target"])
+        assert test.index.intersection(dev.index).empty, "Test and dev samples have intersection"
+        
+        # Save the preprocessed data
+        self.save(train, "train")
+        self.save(dev, "dev")
+        self.save(test, "test")
+        return df
 
 
     
