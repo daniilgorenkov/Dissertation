@@ -280,7 +280,7 @@ class Preprocessor(FileOperator):
         self._set_index(dfs) # set index name as time_step
 
         # at this point dfs looks like a list with dataframes where df are separated by forces and speeds
-        # on index is time_step column named like "Vertical 8.3345..."
+        # on index is time_step, column named like "Vertical 8.3345..."
         # Here we will split separated dfs into smaller dfs based on wheel rotation time
         splitted_dfs = []
         for df in dfs:
@@ -300,7 +300,11 @@ class Preprocessor(FileOperator):
             fault_target = 1 if any(keyword in filename for keyword in config.SimulationNames.FAULTS) else 0
             
             filename_profile = [profile for profile in config.SimulationNames.PROFILES if profile in filename]
-            profile_target = config.SimulationNames.PROFILE_TARGET.get(filename_profile[0])
+            
+            if filename_profile:
+                profile_target = config.SimulationNames.PROFILE_TARGET.get(filename_profile[0],0)
+            else:
+                print(f"Profile not found in filename: {filename}")
             feat_df["fault_target"] = fault_target
             feat_df["profile_target"] = profile_target
             
@@ -309,4 +313,19 @@ class Preprocessor(FileOperator):
         return pd.concat(features, axis=0)
 
     
-    
+    def preprocess_all(self,fpaths:list) -> pd.DataFrame:
+
+        n_files = len(fpaths)
+
+        dfs = []
+        for fpath in tqdm(fpaths, desc="Preprocessing files", total=n_files):
+
+            df = self.preprocess_file_results(fpath)
+            dfs.append(df)
+        
+        # Concatenate all DataFrames into one
+        final_df = pd.concat(dfs, axis=0)
+        self.save(final_df, "preprocessed_data")
+ 
+
+
