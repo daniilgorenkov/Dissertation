@@ -116,8 +116,6 @@ class Preprocessor(FileOperator):
             start = idxs[idx]
             end = idxs[idx + 1]
             sim_results.append(df.iloc[start:end].iloc[:, :2])
-
-        # print(f"total simulation results: {len(sim_results)}")
         
         return sim_results
 
