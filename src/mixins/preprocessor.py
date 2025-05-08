@@ -1,3 +1,4 @@
+from fileinput import filename
 import config
 import os
 import pandas as pd
@@ -28,7 +29,7 @@ class Preprocessor(FileOperator):
                 self.new_cols.append(col)
         self.new_cols.insert(0, "time_step")
         df.columns = self.new_cols
-        # self.pbar.update(1)
+        
         return df
 
     def _get_split_index(self, df: pd.DataFrame) -> list:
@@ -36,43 +37,69 @@ class Preprocessor(FileOperator):
         Get the index at which to split the DataFrame into the train and test sets.
 
         :param df: The DataFrame to split.
-        :return: The index at which to split the DataFrame.
+        :return: The index at which to split the DataFrame. If the DataFrame has 12 speeds, must return 24 indexes, if 8 speeds - 16 indexes.
+                It depends on `-1` number so it must be static.
+
+        Example
+        -------
+        >>> df = pd.DataFrame({'time_step': [0, 0.1, 0.2, 15, 15.1, 15.2],'Vertical 2.78':[0, 1, 2, 3, 4, 5]})
+        >>> self._get_split_index(df)
+        [0, 3, 6]
         """
-        idxs = df[df["time_step"].diff() < -10].index.tolist()
+
+        idxs = df[df["time_step"].diff() < -1].index.tolist()
         idxs.insert(0, 0)
         idxs.append(df.shape[0])
-        # self.pbar.update(1)
+        
         return idxs
     
-    def _wheel_rotation_time(self, df: pd.DataFrame) -> np.ndarray:
-        speed = float(df.columns[0].split(" ")[1])
-        lenght = 2 * np.pi * config.WagonParams.WHEEL_RADIUS
-        t = lenght / speed
-        max_indx = df.index.max()
-        n_slices = int(max_indx//t)
-        indexes = np.linspace(0, max_indx, n_slices)
-        # self.pbar.update(1)
-        return indexes
-    
-    def split_df_by_time_indices(self,df:pd.DataFrame) -> pd.DataFrame:
-        indices = self._wheel_rotation_time(df)
-        
-        segments = []
-        for i in range(len(indices) - 1):
-            start = indices[i]
-            end = indices[i + 1]
-            segment = df.loc[start:end]
-            segments.append(segment)
-        
-        for i, seg in enumerate(segments):
-            n = len(seg)
-            # calcular paso promedio (asumiendo time_step constante)
-            step = seg.index.to_series().diff().median()
-            new_index = np.arange(0, n * step, step)[:n]
-            seg.index = new_index
-            segments[i] = seg
-        # self.pbar.update(1)
-        return pd.concat(segments,axis=1)
+    def _get_rotation_indices_for_column(self, df: pd.DataFrame, col: str) -> np.ndarray:
+        """
+        Calculate split indices for a single column based on wheel rotation time.
+
+        :param df: The DataFrame containing the data.
+        :param col: The column name (e.g., "Vertical 5.56").
+        :return: An array of index positions where the DataFrame should be split.
+        """
+        spl = col.split(" ")
+        cleaned_list = [item for item in spl if item.strip()]
+        speed = float(cleaned_list[1])  # Will raise if the format is wrong
+
+        length = 2 * np.pi * config.WagonParams.WHEEL_RADIUS
+        t = length / speed
+        max_index = df.index.max()
+        n_slices = int(max_index // t)
+
+        # print(f"Speed: {speed:.2f}, Wheel rotation time: {t:.4f}, Slices: {n_slices}")
+        return np.linspace(0, max_index, n_slices + 1)
+
+
+    def split_df_by_time_indices(self, df: list[pd.DataFrame]) -> pd.DataFrame:
+        """
+        Split all columns in the DataFrame into segments based on wheel rotation time.
+
+        :param df: The DataFrame with multiple speed-based columns.
+        :return: List of segmented DataFrames.
+        """
+        all_segments = []
+
+        for col in df.columns:
+            # print(df.columns)
+            indices = self._get_rotation_indices_for_column(df, col)
+
+            for i in range(len(indices) - 1):
+                start, end = indices[i], indices[i + 1]
+                mask = (df.index >= start) & (df.index < end)
+                segment = df.loc[mask, [col]].copy()
+                if not segment.empty:
+                    step = segment.index.to_series().diff().median()
+                    new_index = np.arange(0, len(segment) * step, step)[:len(segment)]
+                    segment.index = new_index
+                    all_segments.append(segment)
+
+        return pd.concat(all_segments,axis=1)
+
+
 
     def _split_data(self, df: pd.DataFrame, idxs: list):
         """
@@ -90,8 +117,8 @@ class Preprocessor(FileOperator):
             end = idxs[idx + 1]
             sim_results.append(df.iloc[start:end].iloc[:, :2])
 
-        print(f"total simulation results: {len(sim_results)}")
-        # self.pbar.update(1)
+        # print(f"total simulation results: {len(sim_results)}")
+        
         return sim_results
 
     def _rename_columns(self, dfs: list[pd.DataFrame]) -> list:
@@ -103,7 +130,7 @@ class Preprocessor(FileOperator):
         """
         for df, col in zip(dfs, self.new_cols[1:]):
             df.columns = ["time_step", col]
-        # self.pbar.update(1)
+        
         
 
     def _set_index(self, dfs: list[pd.DataFrame]) -> list:
@@ -115,7 +142,7 @@ class Preprocessor(FileOperator):
         """
         for df in dfs:
             df.set_index("time_step", inplace=True)
-        # self.pbar.update(1)
+        
 
     def compute_statistical_features(self,df:pd.DataFrame) -> dict:
         stats = {}
@@ -238,24 +265,48 @@ class Preprocessor(FileOperator):
         return df
 
 
-    def preprocess_file_results(self, filename: str) -> pd.DataFrame:
+    def preprocess_file_results(self, filepath: str) -> pd.DataFrame:
         """
         Preprocess the results of a simulation file.
 
         :param filename: The name of the file to preprocess.
         :return: A DataFrame containing the preprocessed data.
         """
-        df = self.load_csv(filename)
-        df = self._reset_column_names(df)
-        idxs = self._get_split_index(df)
-        dfs = self._split_data(df, idxs)
-        self._rename_columns(dfs)
-        self._set_index(dfs)
-        for i in range(len(dfs)):
-            dfs[i] = self.split_df_by_time_indices(dfs[i])
-            dfs[i] = self.rename_duplicated_columns(dfs[i])
-            dfs[i] = self.extract_features_from_force_df(dfs[i])
-        # self.pbar.update(1)
-        return dfs
+        df = self.load_csv(filepath) # load csv file
+        df = self._reset_column_names(df) # as column names are weird clean them
+        idxs = self._get_split_index(df) # as simulation results go one by one in one column, searching for indexes where split them
+        dfs = self._split_data(df, idxs) # split the data into smaller DataFrames based on the indices
+        self._rename_columns(dfs) # rename columns to be more readable
+        self._set_index(dfs) # set index name as time_step
+
+        # at this point dfs looks like a list with dataframes where df are separated by forces and speeds
+        # on index is time_step column named like "Vertical 8.3345..."
+        # Here we will split separated dfs into smaller dfs based on wheel rotation time
+        splitted_dfs = []
+        for df in dfs:
+            segments = self.split_df_by_time_indices(df)  # list of split DataFrames
+            splitted_dfs.append(segments)
+        
+        # now as we have splitted dfs we need to extract features from them
+        features = []
+        for part in splitted_dfs:
+            # mark duplicated columns with _1, _2, _3... etc.
+            part = self.rename_duplicated_columns(part)
+            # Extract features from each segment excpects that in df in columns are names "Vertical 8.3345..."
+            feat_df = self.extract_features_from_force_df(part)  # shape: (num_columns, num_features)
+            
+            # Add target column based on filename
+            filename = os.path.basename(filepath)
+            fault_target = 1 if any(keyword in filename for keyword in config.SimulationNames.FAULTS) else 0
+            
+            filename_profile = [profile for profile in config.SimulationNames.PROFILES if profile in filename]
+            profile_target = config.SimulationNames.PROFILE_TARGET.get(filename_profile[0])
+            feat_df["fault_target"] = fault_target
+            feat_df["profile_target"] = profile_target
+            
+            features.append(feat_df)
+
+        return pd.concat(features, axis=0)
+
     
     
