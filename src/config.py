@@ -49,7 +49,8 @@ class Preprocessor:
 
     ]
     IGNORE_COLUMNS = ["Unnamed: 24", "Unnamed: 16"]
-    DTYPES_OUT:dict = {
+    
+    NUMERICAL_DTYPES = {
     'mean': np.float32,
     'max': np.float32,
     'min': np.float32,
@@ -64,12 +65,31 @@ class Preprocessor:
     'iqr': np.float32,
     'first_derivative_mean': np.float32,
     'second_derivative_mean': np.float32,
-    'num_zero_crossings': np.int32,
-    'num_peaks': np.int32,
-    'num_troughs': np.int32,
     'dominant_frequency': np.float32,
     'spectral_energy': np.float32,
     'spectral_entropy': np.float32,
+    }
+
+    CATEGORICAL_DTYPES = {
+    'num_zero_crossings': np.int32,
+    'num_peaks': np.int32,
+    'num_troughs': np.int32,
+    }
+    
+    TARGET_DTYPES = {
     'fault_target': np.int32,
     'profile_target': np.int32
-}
+    }
+
+    DTYPES_OUT:dict = {
+    **NUMERICAL_DTYPES,
+    **CATEGORICAL_DTYPES,
+    **TARGET_DTYPES
+    }
+
+
+    TARGETS = TARGET_DTYPES.keys()
+    CATEGORICAL_COLS = CATEGORICAL_DTYPES.keys()
+    NUMERICAL_COLS = NUMERICAL_DTYPES.keys()
+    
+    SAMPLE_STRATEGY = "auto"

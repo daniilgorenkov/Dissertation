@@ -1,4 +1,3 @@
-from fileinput import filename
 import config
 import os
 import pandas as pd
@@ -7,6 +6,9 @@ from mixins.file_operator import FileOperator
 from tqdm import tqdm 
 from scipy.signal import find_peaks
 from scipy.fft import fft
+from imblearn.over_sampling import SMOTENC
+from utils import cats_first_floats_later, standardize_float_columns
+import gc
 
 class Preprocessor(FileOperator):
     def __init__(self):
@@ -314,6 +316,7 @@ class Preprocessor(FileOperator):
             if col in df.columns:
                 df[col] = df[col].astype(dtype)
         
+        gc.collect()  # Force garbage collection to free up memory
         return df
 
     
@@ -350,5 +353,45 @@ class Preprocessor(FileOperator):
         final_df = pd.concat(dfs, axis=0)
         self.save(final_df, "preprocessed_data")
  
+    def data_augmentation(self) -> pd.DataFrame:
+        
+        df:pd.DataFrame = self.load("preprocessed_data")
+        # Create a copy of the DataFrame for augmentation
+        # As we have 2 types of targets we will make 2 augmentations for each target due to targets distributions
+        for target in tqdm(config.Preprocessor.TARGETS, desc="Augmenting data", total=len(config.Preprocessor.TARGETS)):
+            X = df.drop(config.Preprocessor.TARGETS,axis=1).copy()
+            feature_cols = X.columns
+            y = df[target].copy()
 
+            categorical_features = [df.columns.get_loc(col) for col in config.Preprocessor.CATEGORICAL_COLS if not col.endswith("_target") ] 
+            smotenc = SMOTENC(categorical_features=categorical_features,
+                              sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
+                              random_state=config.Common.SEED)
+
+            X_aug, y_aug = smotenc.fit_resample(X, y)
+
+            # Create augmented DataFrame
+            augmented_df = pd.DataFrame(X_aug, columns=feature_cols)
+            augmented_df[target] = y_aug
+
+            for col in [col for col in config.Preprocessor.CATEGORICAL_COLS if col not in config.Preprocessor.TARGETS]:
+                if col in augmented_df.columns:
+                    augmented_df[col] = augmented_df[col].round().clip(lower=0)
+
+            # Apply dtypes from config
+            augmented_df = augmented_df.astype({
+                **config.Preprocessor.CATEGORICAL_DTYPES,
+                **config.Preprocessor.NUMERICAL_DTYPES,
+            })
+
+            # Store and save augmented DataFrame
+            self.save(augmented_df, f"preprocessed_data_{target}")
+            gc.collect()  # Force garbage collection to free up memory
+    
+    def preprocess(self):
+        """
+        Preprocess the data by loading, cleaning, and saving it.
+        """
+        self.preprocess_all_files()
+        self.data_augmentation()
 
