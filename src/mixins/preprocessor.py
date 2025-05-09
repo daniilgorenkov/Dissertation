@@ -7,7 +7,7 @@ from tqdm import tqdm
 from scipy.signal import find_peaks
 from scipy.fft import fft
 from imblearn.over_sampling import SMOTENC
-from utils import cats_first_floats_later, standardize_float_columns
+from mixins.utils import cats_first_floats_later, standardize_float_columns
 import gc
 
 class Preprocessor(FileOperator):
@@ -384,6 +384,13 @@ class Preprocessor(FileOperator):
                 **config.Preprocessor.NUMERICAL_DTYPES,
             })
 
+            # Standardize float columns
+
+            augmented_floats = standardize_float_columns(augmented_df, ignore_cols=list(config.Preprocessor.CATEGORICAL_COLS) + [target])
+            augmented_df[augmented_floats.columns] = augmented_floats
+            # Reorder columns to have categorical columns first
+            augmented_df = cats_first_floats_later(augmented_df)
+            
             # Store and save augmented DataFrame
             self.save(augmented_df, f"preprocessed_data_{target}")
             gc.collect()  # Force garbage collection to free up memory

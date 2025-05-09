@@ -25,7 +25,7 @@ def cats_first_floats_later(df: pd.DataFrame) -> pd.DataFrame:
 
 def standardize_float_columns(
     df: pd.DataFrame, scaler: Optional[StandardScaler] = None, ignore_cols: Optional[List[str]] = None
-) -> Tuple[pd.DataFrame, StandardScaler]:
+) -> pd.DataFrame:
     """
     Standardize float columns so they have mean=0 and std=1, using sklearn's StandardScaler.
 
@@ -68,4 +68,4 @@ def standardize_float_columns(
         # Use the existing scaler to transform these columns
         scaled_df[float_cols] = scaler.transform(scaled_df[float_cols])
 
-    return scaled_df, scaler
+    return scaled_df
