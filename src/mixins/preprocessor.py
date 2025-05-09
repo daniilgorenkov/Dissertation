@@ -308,15 +308,40 @@ class Preprocessor(FileOperator):
             
             features.append(feat_df)
 
-        return pd.concat(features, axis=0)
+        df = pd.concat(features, axis=0)  # Concatenate all DataFrames into one
+        # Set each column's dtype from config.Preprocessor.DTYPES_OUT
+        for col, dtype in config.Preprocessor.DTYPES_OUT.items():
+            if col in df.columns:
+                df[col] = df[col].astype(dtype)
+        
+        return df
 
     
-    def preprocess_all(self,fpaths:list) -> pd.DataFrame:
+    def preprocess_all_files(self) -> pd.DataFrame:
 
-        n_files = len(fpaths)
+        versions = os.listdir(config.Paths._EMPTY)
+
+        empty_fnames = [os.listdir(os.path.join(config.Paths._EMPTY, v)) for v in versions]
+        loaded_fnames = [os.listdir(os.path.join(config.Paths._LOADED, v)) for v in versions]
+
+        # Create full paths
+        empty_paths = [
+            os.path.join(config.Paths._EMPTY, version, fname)
+            for version, fnames in zip(versions, empty_fnames)
+            for fname in fnames
+        ]
+        loaded_paths = [
+            os.path.join(config.Paths._LOADED, version, fname)
+            for version, fnames in zip(versions, loaded_fnames)
+            for fname in fnames
+        ]
+        
+        # Combine all paths into on list
+        all_paths = empty_paths + loaded_paths
+        n_files = len(all_paths)
 
         dfs = []
-        for fpath in tqdm(fpaths, desc="Preprocessing files", total=n_files):
+        for fpath in tqdm(all_paths, desc="Preprocessing files", total=n_files):
 
             df = self.preprocess_file_results(fpath)
             dfs.append(df)

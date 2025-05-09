@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 
 class Common:
@@ -11,6 +12,7 @@ class Paths:
     DATA = os.path.join(WORKDIR, "data")
     _EMPTY = os.path.join(DATA, "empty")
     _LOADED = os.path.join(DATA, "loaded")
+
 
 class WagonParams:
     WHEEL_RADIUS = 0.475  # m
@@ -47,3 +49,27 @@ class Preprocessor:
 
     ]
     IGNORE_COLUMNS = ["Unnamed: 24", "Unnamed: 16"]
+    DTYPES_OUT:dict = {
+    'mean': np.float32,
+    'max': np.float32,
+    'min': np.float32,
+    'median': np.float32,
+    'std': np.float32,
+    'variance': np.float32,
+    'skewness': np.float32,
+    'kurtosis': np.float32,
+    'range': np.float32,
+    'percentile_25': np.float32,
+    'percentile_75': np.float32,
+    'iqr': np.float32,
+    'first_derivative_mean': np.float32,
+    'second_derivative_mean': np.float32,
+    'num_zero_crossings': np.int32,
+    'num_peaks': np.int32,
+    'num_troughs': np.int32,
+    'dominant_frequency': np.float32,
+    'spectral_energy': np.float32,
+    'spectral_entropy': np.float32,
+    'fault_target': np.int32,
+    'profile_target': np.int32
+}
