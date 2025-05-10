@@ -7,7 +7,7 @@ from tqdm import tqdm
 from scipy.signal import find_peaks
 from scipy.fft import fft
 from imblearn.over_sampling import SMOTENC
-from mixins.utils import cats_first_floats_later, standardize_float_columns
+from mixins.utils import cats_first_floats_later, standardize_float_columns,is_float
 import gc
 
 class Preprocessor(FileOperator):
@@ -28,6 +28,12 @@ class Preprocessor(FileOperator):
             for char in config.Preprocessor.BAD_CHARS:
                 col: str = col.replace(char, "")
             if col not in config.Preprocessor.IGNORE_COLUMNS:
+                # clear column name string and round speed value
+                split_col = col.split(" ")
+                clean_split = [sp for sp in split_col if sp != ""]
+                assert is_float(clean_split[1]), f"Second string value isn't float {clean_split[1]}"
+                rounded_speed = round(float(clean_split[1]),2)
+                col = f"{clean_split[0]} {rounded_speed}"
                 self.new_cols.append(col)
         self.new_cols.insert(0, "time_step")
         df.columns = self.new_cols
@@ -102,7 +108,6 @@ class Preprocessor(FileOperator):
         return pd.concat(all_segments,axis=1)
 
 
-
     def _split_data(self, df: pd.DataFrame, idxs: list):
         """
         Splits the given DataFrame into smaller DataFrames based on the provided indices.
@@ -130,7 +135,6 @@ class Preprocessor(FileOperator):
         """
         for df, col in zip(dfs, self.new_cols[1:]):
             df.columns = ["time_step", col]
-        
         
 
     def _set_index(self, dfs: list[pd.DataFrame]) -> list:

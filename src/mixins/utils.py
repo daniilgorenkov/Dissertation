@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np 
 from sklearn.preprocessing import StandardScaler
 from typing import Optional, List, Tuple
+import re
 
 INT_DTYPES = ["int8", "int16", "int32", "int64"]
 FLOAT_DTYPES = ["float", "float16", "float32", "float64"]
@@ -69,3 +70,14 @@ def standardize_float_columns(
         scaled_df[float_cols] = scaler.transform(scaled_df[float_cols])
 
     return scaled_df
+
+def is_float(s:str):
+    """Checks string for float type"""
+    # Pattern explanation:
+    # ^[+-]?      : Optional sign (+/-)
+    # \d+\.\d+    : At least one digit before and after the decimal point (e.g., "12.3")
+    # |\.\d+      : Or a decimal point followed by digits (e.g., ".5")
+    # |\d+\.?     : Or digits with an optional trailing decimal point (e.g., "5.")
+    # (?:...)$    : Non-capturing group to end the string
+    pattern = r'^[+-]?(?:\d+\.\d+|\.\d+|\d+\.?)$'
+    return re.fullmatch(pattern, s) is not None
