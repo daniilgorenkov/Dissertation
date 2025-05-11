@@ -7,8 +7,18 @@ from tqdm import tqdm
 from scipy.signal import find_peaks
 from scipy.fft import fft
 from imblearn.over_sampling import SMOTENC
-from mixins.utils import cats_first_floats_later, standardize_float_columns,is_float
+from mixins.utils import cats_first_floats_later, standardize_float_columns,is_float,apply_prefix_to_dtype_dict
 import gc
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,  # Log level, you can choose DEBUG, INFO, WARNING, ERROR, or CRITICAL
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Log message format
+    handlers=[
+        logging.FileHandler(os.path.join(config.Paths._LOGS,'pipeline.log')),  # Log to a file
+    ]
+)
+
 
 class Preprocessor(FileOperator):
     def __init__(self):
@@ -102,6 +112,7 @@ class Preprocessor(FileOperator):
             segment = df.loc[mask, cols].copy()
             if not segment.empty:
                 segment.name = f"{cols}_{i}"  # Make column name unique
+                segment = segment.reset_index(drop=True)
                 all_segments.append(segment)
 
         return pd.concat(all_segments, axis=1)
@@ -323,6 +334,7 @@ class Preprocessor(FileOperator):
         :param filename: The name of the file to preprocess.
         :return: A DataFrame containing the preprocessed data.
         """
+        logging.debug(f"Preprocessing file: {filepath}")
         self.is_straight = True if "straight" in os.path.basename(filepath).split("_") else False
         df = self.load_csv(filepath) # load csv file
         df = self._reset_column_names(df) # as column names are weird clean them
@@ -398,13 +410,16 @@ class Preprocessor(FileOperator):
         df:pd.DataFrame = self.load("preprocessed_data")
         # Create a copy of the DataFrame for augmentation
         # As we have 2 types of targets we will make 2 augmentations for each target due to targets distributions
+        CATEGORICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.CATEGORICAL_DTYPES, config.Preprocessor.PREFIXES)
+        NUMERICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.NUMERICAL_DTYPES, config.Preprocessor.PREFIXES)
+        
         for target in tqdm(config.Preprocessor.TARGETS, desc="Augmenting data", total=len(config.Preprocessor.TARGETS)):
             X = df.drop(config.Preprocessor.TARGETS,axis=1).copy()
             feature_cols = X.columns
             y = df[target].copy()
 
-            categorical_features = [df.columns.get_loc(col) for col in config.Preprocessor.CATEGORICAL_COLS if not col.endswith("_target") ] 
-            smotenc = SMOTENC(categorical_features=categorical_features,
+ 
+            smotenc = SMOTENC(categorical_features=CATEGORICAL_DTYPES.keys(),
                               sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
                               random_state=config.Common.SEED)
 
@@ -414,19 +429,19 @@ class Preprocessor(FileOperator):
             augmented_df = pd.DataFrame(X_aug, columns=feature_cols)
             augmented_df[target] = y_aug
 
-            for col in [col for col in config.Preprocessor.CATEGORICAL_COLS if col not in config.Preprocessor.TARGETS]:
+            for col in [col for col in CATEGORICAL_DTYPES.keys() if col not in config.Preprocessor.TARGETS]:
                 if col in augmented_df.columns:
                     augmented_df[col] = augmented_df[col].round().clip(lower=0)
 
-            # Apply dtypes from config
+            
             augmented_df = augmented_df.astype({
-                **config.Preprocessor.CATEGORICAL_DTYPES,
-                **config.Preprocessor.NUMERICAL_DTYPES,
+                **CATEGORICAL_DTYPES,
+                **NUMERICAL_DTYPES,
             })
 
-            # Standardize float columns
 
-            augmented_floats = standardize_float_columns(augmented_df, ignore_cols=list(config.Preprocessor.CATEGORICAL_COLS) + [target])
+            # Standardize float columns
+            augmented_floats = standardize_float_columns(augmented_df, ignore_cols=list(CATEGORICAL_DTYPES.keys()) + [target])
             augmented_df[augmented_floats.columns] = augmented_floats
             # Reorder columns to have categorical columns first
             augmented_df = cats_first_floats_later(augmented_df)

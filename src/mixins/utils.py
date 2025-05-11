@@ -81,3 +81,25 @@ def is_float(s:str):
     # (?:...)$    : Non-capturing group to end the string
     pattern = r'^[+-]?(?:\d+\.\d+|\.\d+|\d+\.?)$'
     return re.fullmatch(pattern, s) is not None
+
+def apply_prefix_to_dtype_dict(base_dtype_dict:dict, prefixes:list, available_columns=None):
+    """
+    Given a dtype mapping with base column names and a list of prefixes,
+    returns a new mapping with prefixed column names. Optionally filters
+    by available columns.
+
+    Args:
+        base_dtype_dict (dict): base column name -> dtype
+        prefixes (list of str): list of prefixes to apply
+        available_columns (set or list, optional): if provided, only includes matching columns
+
+    Returns:
+        dict: prefixed column name -> dtype
+    """
+    prefixed_dict = {}
+    for base_col, dtype in base_dtype_dict.items():
+        for prefix in prefixes:
+            full_col = f"{prefix}_{base_col}"
+            if available_columns is None or full_col in available_columns:
+                prefixed_dict[full_col] = dtype
+    return prefixed_dict

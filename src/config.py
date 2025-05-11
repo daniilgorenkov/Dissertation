@@ -1,4 +1,5 @@
 import os
+from site import PREFIXES
 import numpy as np
 
 
@@ -12,6 +13,7 @@ class Paths:
     DATA = os.path.join(WORKDIR, "data")
     _EMPTY = os.path.join(DATA, "empty")
     _LOADED = os.path.join(DATA, "loaded")
+    _LOGS = os.path.join(WORKDIR, "logs")
 
 
 class WagonParams:
@@ -52,6 +54,8 @@ class Preprocessor:
 
     ZERO_VALUE = 1e-6
     
+    PREFIXES = ["vertical","side"]
+
     NUMERICAL_DTYPES = {
     'mean': np.float32,
     'max': np.float32,
