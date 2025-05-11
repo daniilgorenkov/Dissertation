@@ -423,6 +423,9 @@ class Preprocessor(FileOperator):
                               sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
                               random_state=config.Common.SEED)
 
+            # -----------
+            # CHECK NEXT LINES
+            # -----------
             X_aug, y_aug = smotenc.fit_resample(X, y)
 
             # Create augmented DataFrame
