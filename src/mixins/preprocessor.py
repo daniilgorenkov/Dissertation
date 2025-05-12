@@ -413,12 +413,13 @@ class Preprocessor(FileOperator):
         CATEGORICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.CATEGORICAL_DTYPES, config.Preprocessor.PREFIXES)
         NUMERICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.NUMERICAL_DTYPES, config.Preprocessor.PREFIXES)
 
-        categorical_columns = [X.columns.get_loc(col) for col in list(CATEGORICAL_DTYPES.keys())]
+        
         for target in tqdm(config.Preprocessor.TARGETS, desc="Augmenting data", total=len(config.Preprocessor.TARGETS)):
             X = df.drop(config.Preprocessor.TARGETS,axis=1).copy()
             feature_cols = X.columns
             y = df[target].copy()
 
+            categorical_columns = [X.columns.get_loc(col) for col in list(CATEGORICAL_DTYPES.keys())]
 
             smotenc = SMOTENC(categorical_features=categorical_columns,
                                 sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
