@@ -407,25 +407,23 @@ class Preprocessor(FileOperator):
  
     def data_augmentation(self) -> pd.DataFrame:
         
-        df:pd.DataFrame = self.load("preprocessed_data")
+        df:pd.DataFrame = self.load("preprocessed_data").fillna(config.Preprocessor.ZERO_VALUE)
         # Create a copy of the DataFrame for augmentation
         # As we have 2 types of targets we will make 2 augmentations for each target due to targets distributions
         CATEGORICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.CATEGORICAL_DTYPES, config.Preprocessor.PREFIXES)
         NUMERICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.NUMERICAL_DTYPES, config.Preprocessor.PREFIXES)
-        
+
+        categorical_columns = [X.columns.get_loc(col) for col in list(CATEGORICAL_DTYPES.keys())]
         for target in tqdm(config.Preprocessor.TARGETS, desc="Augmenting data", total=len(config.Preprocessor.TARGETS)):
             X = df.drop(config.Preprocessor.TARGETS,axis=1).copy()
             feature_cols = X.columns
             y = df[target].copy()
 
- 
-            smotenc = SMOTENC(categorical_features=CATEGORICAL_DTYPES.keys(),
-                              sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
-                              random_state=config.Common.SEED)
 
-            # -----------
-            # CHECK NEXT LINES
-            # -----------
+            smotenc = SMOTENC(categorical_features=categorical_columns,
+                                sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
+                                random_state=config.Common.SEED)
+            # Apply SMOTENC to the DataFrame
             X_aug, y_aug = smotenc.fit_resample(X, y)
 
             # Create augmented DataFrame
@@ -434,7 +432,7 @@ class Preprocessor(FileOperator):
 
             for col in [col for col in CATEGORICAL_DTYPES.keys() if col not in config.Preprocessor.TARGETS]:
                 if col in augmented_df.columns:
-                    augmented_df[col] = augmented_df[col].round().clip(lower=0)
+                    augmented_df[col] = augmented_df[col].round().clip(lower=comfig.Preprocessor.ZERO_VALUE)
 
             
             augmented_df = augmented_df.astype({
