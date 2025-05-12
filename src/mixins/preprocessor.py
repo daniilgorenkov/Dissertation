@@ -432,7 +432,7 @@ class Preprocessor(FileOperator):
 
             for col in [col for col in CATEGORICAL_DTYPES.keys() if col not in config.Preprocessor.TARGETS]:
                 if col in augmented_df.columns:
-                    augmented_df[col] = augmented_df[col].round().clip(lower=comfig.Preprocessor.ZERO_VALUE)
+                    augmented_df[col] = augmented_df[col].round().clip(lower=config.Preprocessor.ZERO_VALUE)
 
             
             augmented_df = augmented_df.astype({
