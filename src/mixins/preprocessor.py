@@ -3,28 +3,22 @@ import os
 import pandas as pd
 import numpy as np
 from mixins.file_operator import FileOperator
+from mixins.utils import set_logger
 from tqdm import tqdm 
 from scipy.signal import find_peaks
 from scipy.fft import fft
 from imblearn.over_sampling import SMOTENC
 from mixins.utils import cats_first_floats_later, standardize_float_columns,is_float,apply_prefix_to_dtype_dict
 import gc
-import logging
 
-logging.basicConfig(
-    level=logging.DEBUG,  # Log level, you can choose DEBUG, INFO, WARNING, ERROR, or CRITICAL
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Log message format
-    handlers=[
-        logging.FileHandler(os.path.join(config.Paths._LOGS,'pipeline.log')),  # Log to a file
-    ]
-)
+logger = set_logger(config.Paths._LOGS)
 
 
 class Preprocessor(FileOperator):
     def __init__(self):
         super().__init__()
         self.functions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__")]
-        # self.pbar = tqdm(total=len(self.functions), desc="Preprocessing")
+   
 
     def _reset_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -334,7 +328,7 @@ class Preprocessor(FileOperator):
         :param filename: The name of the file to preprocess.
         :return: A DataFrame containing the preprocessed data.
         """
-        logging.debug(f"Preprocessing file: {filepath}")
+        logger.debug(f"Preprocessing file: {filepath}")
         self.is_straight = True if "straight" in os.path.basename(filepath).split("_") else False
         df = self.load_csv(filepath) # load csv file
         df = self._reset_column_names(df) # as column names are weird clean them

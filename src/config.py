@@ -1,5 +1,5 @@
 import os
-from site import PREFIXES
+import torch
 import numpy as np
 
 
@@ -99,3 +99,15 @@ class Preprocessor:
     NUMERICAL_COLS = NUMERICAL_DTYPES.keys()
     
     SAMPLE_STRATEGY = "auto"
+
+
+class Trainer:
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    N_TRIALS = 5
+    BOOST_PARAMS = {
+        'task_type': 'GPU' if DEVICE == "cuda" else "CPU",
+        "iterations": 200,
+        "depth":15,
+        "random_seed":Common.SEED,
+        "learning_rate":0.1,
+    }

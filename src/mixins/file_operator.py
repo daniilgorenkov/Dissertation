@@ -2,6 +2,8 @@ import config
 import os
 import pandas as pd
 import pickle
+from mixins.utils import set_logger
+logger = set_logger(config.Paths._LOGS)
 
 
 class FileOperator:

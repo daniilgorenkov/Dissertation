@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from typing import Optional, List, Tuple
 import re
+import logging
+import os
 
 INT_DTYPES = ["int8", "int16", "int32", "int64"]
 FLOAT_DTYPES = ["float", "float16", "float32", "float64"]
@@ -103,3 +105,23 @@ def apply_prefix_to_dtype_dict(base_dtype_dict:dict, prefixes:list, available_co
             if available_columns is None or full_col in available_columns:
                 prefixed_dict[full_col] = dtype
     return prefixed_dict
+
+def set_logger(folder_name: str, file_name: str = "logger.log"):
+    logger = logging.getLogger("logger")
+    logger.handlers = []
+    logger.setLevel(logging.DEBUG)
+
+    sh = logging.StreamHandler()
+    sh_formatter = logging.Formatter("%(asctime)s - %(message)s")
+    sh.setFormatter(sh_formatter)
+    sh.setLevel(logging.INFO)
+    logger.addHandler(sh)
+
+    os.makedirs(folder_name, exist_ok=True)
+    fh = logging.FileHandler(os.path.join(folder_name, file_name))
+    file_formatter = logging.Formatter("%(asctime)s - %(levelname)5s() - [%(filename)20s():%(lineno)s - %(funcName)33s() ] - %(message)s") # fmt: skip
+    fh.setFormatter(file_formatter)
+    fh.setLevel(logging.DEBUG)
+    logger.addHandler(fh)
+
+    return logger
