@@ -103,11 +103,27 @@ class Preprocessor:
 
 class Trainer:
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    N_TRIALS = 5
-    BOOST_PARAMS = {
-        'task_type': 'GPU' if DEVICE == "cuda" else "CPU",
-        "iterations": 200,
-        "depth":15,
-        "random_seed":Common.SEED,
-        "learning_rate":0.1,
+    N_TRIALS = 2
+    PROFILE_BOOST_PARAMS = {
+        'iterations': 516,
+        'depth': 5,
+        'learning_rate': 0.13211202488090648,
+        'l2_leaf_reg': 9.43485032895685,
+        'random_strength': 0.7151665545857637,
+        'bagging_temperature': 0.11412417323963553,
+        'border_count': 171,
+        'random_seed': Common.SEED,
+        'task_type': 'GPU',
+
+    }
+    FAULT_BOOST_PARAMS = {
+        'iterations': 381,
+        'depth': 3,
+        'learning_rate': 0.2689777123362394,
+        'l2_leaf_reg': 9.523826971416215,
+        'random_strength': 0.5632573376683527,
+        'bagging_temperature': 0.41075176991945006,
+        'border_count': 230,
+        'random_seed': Common.SEED,
+        'task_type': 'GPU',
     }

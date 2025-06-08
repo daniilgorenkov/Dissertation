@@ -10,7 +10,7 @@ from contextlib import redirect_stdout
 import optuna
 from catboost import CatBoostClassifier, Pool
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import log_loss, roc_auc_score
+from sklearn.metrics import log_loss, roc_auc_score,accuracy_score, precision_score, recall_score,multilabel_confusion_matrix
 import argparse
 from mixins.file_operator import FileOperator
 from sklearn.model_selection import train_test_split
@@ -22,7 +22,7 @@ seed = config.Common.SEED
 np.random.seed(seed)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--update_params", type=str)  # environment, For prod only need this.
+parser.add_argument("--update_params", action="store_true")  # environment, For prod only need this.
 args, _ = parser.parse_known_args()
 
 class ForcesDataset:
@@ -67,31 +67,35 @@ class Trainer(FileOperator):
         return model      
     
     def log_model_results(self,
-                          ds:dict,
-                          model:CatBoostClassifier,
-                          model_task:str="fault_target"):
-        
+                      ds: dict,
+                      model: CatBoostClassifier,
+                      model_task: str = "fault_target"):
+
         models_scores = {}
         logger.debug(f"{model_task.upper()} model results:")
-        logger.debug(f"{'-'*88}")
-        logger.debug(f"{'split':>12} | {'log_loss':>9} | {'std':>9} | {'min':>9} | {'max':>9} | {'auc_roc':>9} | {'rows':>9} |")  # fmt: skip
-        logger.debug(f"{'-'*88}")
+        logger.debug(f"{'-'*128}")
+        logger.debug(f"{'split':>12} | {'log_loss':>9} | {'std':>9} | {'min':>9} | {'max':>9} | {'auc_roc':>9} | {'accuracy':>9} | {'precision':>9} | {'recall':>9} | {'rows':>9} |")  # fmt: skip
+        logger.debug(f"{'-'*128}")
 
         X_list = ['X_train', 'X_dev', 'X_test']
         y_list = ['y_train', 'y_dev', 'y_test']
-        for x_,y_ in zip(X_list, y_list):
+        for x_, y_ in zip(X_list, y_list):
             x, y = ds[x_], ds[y_]
             preds = model.predict_proba(x)
 
             split_name = x_.split("_")[-1]
 
             if preds.shape[1] == 2:
+                # Binary classification
                 if y.ndim == 2:
                     y = np.argmax(y, axis=1)
+                y_pred = (preds[:, 1] > 0.5).astype(int)
                 auc = roc_auc_score(y, preds[:, 1])
             else:
+                # Multiclass classification
                 if y.ndim == 2:
                     y = np.argmax(y, axis=1)
+                y_pred = np.argmax(preds, axis=1)
                 auc = roc_auc_score(y, preds, multi_class='ovr')
 
             models_scores[split_name] = {
@@ -100,25 +104,27 @@ class Trainer(FileOperator):
                 "min": preds.min(),
                 "max": preds.max(),
                 "auc_roc": auc,
+                "accuracy": accuracy_score(y, y_pred),
+                "precision": precision_score(y, y_pred, average='macro'),
+                "recall": recall_score(y, y_pred, average='macro'),
                 "rows": len(y)
             }
 
             logger.debug(
                 f"{split_name:>12} | "
                 f"{models_scores[split_name]['log_loss']:>9.4f} | {models_scores[split_name]['std']:>9.4f} | "
-                f"{preds.min():>9.4f} | {preds.max():>9.4f} | {models_scores[split_name]['auc_roc']:>9.4f} | {len(y):>9} |"
-            )  # fmt: skip
+                f"{preds.min():>9.4f} | {preds.max():>9.4f} | {models_scores[split_name]['auc_roc']:>9.4f} | "
+                f"{models_scores[split_name]['accuracy']:>9.4f} | {models_scores[split_name]['precision']:>9.4f} | {models_scores[split_name]['recall']:>9.4f} |"
+                f"{len(y):>9} |"
+            )
 
-        logger.debug(f"{'-'*88}")
+        logger.debug(f"{'-'*128}")
 
     def train_models(self):
         
         logger.debug(
             f"[ {self.MODEL_NAME.upper()} ] "
-            f"DEVICE: {config.Trainer.DEVICE}, "
-            f"NUM_EPOCHS={config.Trainer.BOOST_PARAMS['iterations']}, "
-            f"DEPTH={config.Trainer.BOOST_PARAMS['depth']}, LR={config.Trainer.BOOST_PARAMS['learning_rate']}, "
-        )
+            f"DEVICE: {config.Trainer.DEVICE}")
 
         # Load datasets
         fault_dataset = ForcesDataset(self.load("preprocessed_data_fault_target")).create_dataset("fault_target")
@@ -135,6 +141,8 @@ class Trainer(FileOperator):
 
         def objective_fault(trial):
             params = suggest_params(trial)
+            params['loss_function'] = 'Logloss'
+            params['eval_metric'] = 'Logloss'
             model = CatBoostClassifier(**params)
             logger.debug(f"Training fault model with params: {params}")
             model.fit(fault_train_pool, eval_set=fault_dev_pool, use_best_model=True)
@@ -144,24 +152,27 @@ class Trainer(FileOperator):
 
         def objective_profile(trial):
             params = suggest_params(trial)
+            params['loss_function'] = 'MultiClass'
+            params['eval_metric'] = 'MultiClass'
             model = CatBoostClassifier(**params)
             logger.debug(f"Training profile model with params: {params}")
             model.fit(profile_train_pool, eval_set=profile_dev_pool, use_best_model=True)
-            preds = model.predict_proba(profile_dataset["X_dev"])
-            return log_loss(profile_dataset["y_dev"], preds)
+            preds = model.predict(profile_dataset["X_dev"])
+            return 1.0 - accuracy_score(profile_dataset["y_dev"], preds)
         
         def suggest_params(trial):
+            
+            
             return {
                 'iterations': trial.suggest_int('iterations', 100, 1000),
-                'depth': trial.suggest_int('depth', 4, 44),
+                'depth': trial.suggest_int('depth', 1, 16),
                 'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
                 'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1.0, 10.0),
                 'random_strength': trial.suggest_float('random_strength', 1e-9, 10.0),
                 'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
                 'border_count': trial.suggest_int('border_count', 32, 255),
                 'task_type': 'GPU' if config.Trainer.DEVICE == "cuda" else "CPU",
-                'verbose': 0,
-                'eval_metric': 'Logloss',
+                'verbose': 1,
                 'early_stopping_rounds': 15,
                 'random_seed': config.Common.SEED
             }
@@ -175,18 +186,19 @@ class Trainer(FileOperator):
             study_fault = optuna.create_study(direction="minimize")
             study_fault.optimize(objective_fault, n_trials=config.Trainer.N_TRIALS)
             pbar.update(1)
-            logger.debug("Best searched params:", study_fault.best_params)
+            logger.debug(f"Best searched params:\n{study_fault.best_params}")
 
             study_profile = optuna.create_study(direction="minimize")
             study_profile.optimize(objective_profile, n_trials=config.Trainer.N_TRIALS)
             pbar.update(1)
             pbar.close()
-            logger.debug("Best searched params:", study_profile.best_params)
+            logger.debug(f"Best searched params:\n{study_profile.best_params}")
 
             # train fault model with best params
             model_fault = CatBoostClassifier(**study_fault.best_params)
             model_fault.fit(fault_train_pool, eval_set=fault_dev_pool, use_best_model=True)
             self.save(model_fault,"fault_model")
+            # model_fault = self.load("fault_model")
             # print logs with stats
             self.log_model_results(fault_dataset,model_fault)
 
@@ -194,7 +206,7 @@ class Trainer(FileOperator):
             model_profile = CatBoostClassifier(**study_fault.best_params)
             model_profile.fit(profile_train_pool, eval_set=profile_dev_pool, use_best_model=True)
             self.save(model_profile,"profile_model")
-            self.log_model_results(profile_dataset,model_profile)
+            self.log_model_results(profile_dataset,model_profile,"profile_target")
 
         else:
             logger.debug(f"Start training models with default params")
