@@ -104,6 +104,7 @@ class Preprocessor:
 class Trainer:
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     N_TRIALS = 2
+    PRINT_ITERATION:int = 50
     PROFILE_BOOST_PARAMS = {
         'iterations': 516,
         'depth': 5,
