@@ -1,19 +1,21 @@
 import os
-import torch
+
 import numpy as np
 
 
 class Common:
     SEED: int = 101
+    DEVICE:str = "cuda"
 
 
 class Paths:
 
-    WORKDIR = os.path.dirname(os.getcwd())  # Dissertation # fmt:skip
-    DATA = os.path.join(WORKDIR, "data")
+    WORKDIR = os.path.dirname(os.getcwd())  # dissertation # fmt:skip
+    _DISSERTATION = os.path.join(WORKDIR,"Dissertation")  # Dissertation
+    DATA = os.path.join(_DISSERTATION, "data")
     _EMPTY = os.path.join(DATA, "empty")
     _LOADED = os.path.join(DATA, "loaded")
-    _LOGS = os.path.join(WORKDIR, "logs")
+    _LOGS = os.path.join(_DISSERTATION, "logs")
 
 
 class WagonParams:
@@ -102,7 +104,7 @@ class Preprocessor:
 
 
 class Trainer:
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    
     N_TRIALS = 2
     PRINT_ITERATION:int = 50
     PROFILE_BOOST_PARAMS = {

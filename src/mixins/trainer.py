@@ -128,7 +128,7 @@ class Trainer(FileOperator):
         
         logger.debug(
             f"[ {self.MODEL_NAME.upper()} ] "
-            f"DEVICE: {config.Trainer.DEVICE}")
+            f"DEVICE: {config.Common.DEVICE}")
 
         # Load datasets
         fault_dataset = ForcesDataset(self.load("preprocessed_data_fault_target")).create_dataset("fault_target")
@@ -147,7 +147,7 @@ class Trainer(FileOperator):
             params = suggest_params(trial)
             params['loss_function'] = 'Logloss'
             params['eval_metric'] = 'Logloss'
-            model = CatBoostClassifier(**params)
+            model = self.MODEL(**params)
             logger.debug(f"Training fault model with params: {params}")
             model.fit(fault_train_pool, eval_set=fault_dev_pool, use_best_model=True)
             preds = model.predict_proba(fault_dataset["X_dev"])
@@ -158,7 +158,7 @@ class Trainer(FileOperator):
             params = suggest_params(trial)
             params['loss_function'] = 'MultiClass'
             params['eval_metric'] = 'MultiClass'
-            model = CatBoostClassifier(**params)
+            model = self.MODEL(**params)
             logger.debug(f"Training profile model with params: {params}")
             model.fit(profile_train_pool, eval_set=profile_dev_pool, use_best_model=True)
             preds = model.predict(profile_dataset["X_dev"])
@@ -199,7 +199,7 @@ class Trainer(FileOperator):
 
             # train fault model with best params
             pbar = tqdm(total=2, desc="Training best models", unit="model")
-            model_fault = CatBoostClassifier(**study_fault.best_params)
+            model_fault = self.MODEL(**study_fault.best_params)
             model_fault.fit(fault_train_pool, eval_set=fault_dev_pool, use_best_model=True)
             self.save(model_fault,"fault_model")
             pbar.update(1)
@@ -208,7 +208,7 @@ class Trainer(FileOperator):
             self.log_model_results(fault_dataset,model_fault)
 
             # train profile model with best params
-            model_profile = CatBoostClassifier(**study_fault.best_params)
+            model_profile = self.MODEL(**study_fault.best_params)
             model_profile.fit(profile_train_pool, eval_set=profile_dev_pool, use_best_model=True)
             self.save(model_profile,"profile_model")
             pbar.update(1)
@@ -219,7 +219,8 @@ class Trainer(FileOperator):
             logger.debug(f"Start training models with default params")
             # fault model training
             pbar = tqdm(total=2, desc="Training best models", unit="model")
-            model_fault = self.model_fit(CatBoostClassifier,fault_train_pool,fault_dev_pool,config.Trainer.FAULT_BOOST_PARAMS)
+            model_fault = self.model_fit(self.MODEL,fault_train_pool,fault_dev_pool,config.Trainer.FAULT_BOOST_PARAMS)
+            
             self.save(model_fault,"fault_model")
             # model_fault = self.load("fault_model")
             pbar.update(1)
@@ -227,7 +228,7 @@ class Trainer(FileOperator):
             self.log_model_results(fault_dataset,model_fault)
 
             # profile model training
-            model_profile = self.model_fit(CatBoostClassifier,profile_train_pool,profile_dev_pool,config.Trainer.PROFILE_BOOST_PARAMS)   
+            model_profile = self.model_fit(self.MODEL,profile_train_pool,profile_dev_pool,config.Trainer.PROFILE_BOOST_PARAMS)   
             self.save(model_profile,"profile_model")
             # model_fault = self.load("fault_model")
             pbar.update(1)

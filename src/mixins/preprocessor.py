@@ -450,6 +450,12 @@ class Preprocessor(FileOperator):
         """
         Preprocess the data by loading, cleaning, and saving it.
         """
-        self.preprocess_all_files()
-        self.data_augmentation()
-
+        
+        if self.is_data_preprocessed() == False:
+            print(self.is_data_preprocessed())
+            self.preprocess_all_files()
+            self.data_augmentation()
+        logger.debug(
+            "Data is already preprocessed, "
+            "Start training models"
+        )

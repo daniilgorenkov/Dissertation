@@ -10,6 +10,17 @@ class FileOperator:
     def __init__(self):
         self.SAVE_PATH = config.Paths.DATA
 
+    def is_data_preprocessed(self):
+        file_names = os.listdir(config.Paths.DATA)
+        files_check = []
+        for names in ["preprocessed_data_profile_target.pkl","preprocessed_data_fault_target.pkl","preprocessed_data.pkl"]:
+            if names in file_names:
+                files_check.append(1)
+        
+        if sum(files_check) == 3:
+            return True
+        return False
+
     def save(self, obj, filename: str):
         """
         Save an object to a file using pickle.
