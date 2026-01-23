@@ -2,14 +2,16 @@ import config
 import os
 import pandas as pd
 import numpy as np
+from scipy.signal import find_peaks
 from mixins.file_operator import FileOperator
 from mixins.utils import set_logger
-from tqdm import tqdm 
-from scipy.signal import find_peaks
+from tqdm import tqdm
 from scipy.fft import fft
 from imblearn.over_sampling import SMOTENC
-from mixins.utils import cats_first_floats_later, standardize_float_columns,is_float,apply_prefix_to_dtype_dict
+from mixins.utils import cats_first_floats_later, standardize_float_columns, is_float, apply_prefix_to_dtype_dict
 import gc
+import uuid
+
 
 logger = set_logger(config.Paths._LOGS)
 
@@ -18,7 +20,6 @@ class Preprocessor(FileOperator):
     def __init__(self):
         super().__init__()
         self.functions = [func for func in dir(self) if callable(getattr(self, func)) and not func.startswith("__")]
-   
 
     def _reset_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -36,12 +37,12 @@ class Preprocessor(FileOperator):
                 split_col = col.split(" ")
                 clean_split = [sp for sp in split_col if sp != ""]
                 assert is_float(clean_split[1]), f"Second string value isn't float {clean_split[1]}"
-                rounded_speed = round(float(clean_split[1]),2)
+                rounded_speed = round(float(clean_split[1]), 2)
                 col = f"{clean_split[0]} {rounded_speed}"
                 self.new_cols.append(col)
         self.new_cols.insert(0, "time_step")
         df.columns = self.new_cols
-        
+
         return df
 
     def _get_split_index(self, df: pd.DataFrame) -> list:
@@ -62,9 +63,9 @@ class Preprocessor(FileOperator):
         idxs = df[df["time_step"].diff() < -1].index.tolist()
         idxs.insert(0, 0)
         idxs.append(df.shape[0])
-        
+
         return idxs
-    
+
     def _get_rotation_indices_for_column(self, df: pd.DataFrame, col: str) -> np.ndarray:
         """
         Calculate split indices for a single column based on wheel rotation time.
@@ -87,8 +88,7 @@ class Preprocessor(FileOperator):
         # print(f"Speed: {speed:.2f}, Wheel rotation time: {t:.4f}, Slices: {n_slices}")
         return np.linspace(0, max_index, n_slices + 1)
 
-
-    def split_df_by_time_indices(self,df: list[pd.DataFrame]) -> pd.DataFrame:
+    def split_df_by_time_indices(self, df: list[pd.DataFrame]) -> pd.DataFrame:
         """
         Split all columns in the DataFrame into segments based on wheel rotation time.
 
@@ -111,70 +111,67 @@ class Preprocessor(FileOperator):
 
         return pd.concat(all_segments, axis=1)
 
-    def _split(self,df:pd.DataFrame,idxs:list,vertical:bool=True):
+    def _split(self, df: pd.DataFrame, idxs: list, vertical: bool = True):
         results = []
 
         switcher = 12 if self.is_straight else 8
 
         if vertical == True:
             columns = [col for col in df.columns if col.startswith("Vertical")]
-            for idx,col in zip(range(len(idxs) - 1),columns):
-                
+            for idx, col in zip(range(len(idxs) - 1), columns):
+
                 start = idxs[idx]
                 end = idxs[idx + 1]
 
-                upd_df = df.iloc[start:end].iloc[:,:2] # taking only first two columns cuz our results are in 2 column
-                upd_df.columns = ["time_step",col]
-                upd_df.set_index("time_step",inplace=True,drop=True)
-                results.append(upd_df) 
-        
+                upd_df = df.iloc[start:end].iloc[:, :2]  # taking only first two columns cuz our results are in 2 column
+                upd_df.columns = ["time_step", col]
+                upd_df.set_index("time_step", inplace=True, drop=True)
+                results.append(upd_df)
+
         elif vertical == False:
             columns = [col for col in df.columns if col.startswith("Side")]
 
-            idxs = idxs[switcher:] # 8 or 12 depends on curve or straight
+            idxs = idxs[switcher:]  # 8 or 12 depends on curve or straight
 
-            for idx,col in zip(range(len(idxs) - 1),columns):
+            for idx, col in zip(range(len(idxs) - 1), columns):
 
                 start = idxs[idx]
                 end = idxs[idx + 1]
-                upd_df = df.iloc[start:end].iloc[:,:2] # taking only first two columns cuz our results are in 2 column
-                upd_df.columns = ["time_step",col]
-                upd_df.set_index("time_step",inplace=True,drop=True)
-                results.append(upd_df) 
+                upd_df = df.iloc[start:end].iloc[:, :2]  # taking only first two columns cuz our results are in 2 column
+                upd_df.columns = ["time_step", col]
+                upd_df.set_index("time_step", inplace=True, drop=True)
+                results.append(upd_df)
 
         return results
 
     def _split_data(self, df: pd.DataFrame, idxs: list) -> tuple[list, list]:
 
-        verticals = self._split(df,idxs)
-        sides = self._split(df,idxs,False)
-        
-        return verticals, sides
-        
+        verticals = self._split(df, idxs)
+        sides = self._split(df, idxs, False)
 
-    def compute_statistical_features(self,df:pd.DataFrame) -> dict:
+        return verticals, sides
+
+    def compute_statistical_features(self, df: pd.DataFrame) -> dict:
         stats = {}
         for col in df.columns:
             series = df[col]
             stats[col] = {
-                'mean': series.mean(),
-                'max': series.max(),
-                'min': series.min(),
-                'median': series.median(),
-                'std': series.std(),
-                'variance': series.var(),
-                'skewness': series.skew(),
-                'kurtosis': series.kurt(),
-                'range': series.max() - series.min(),
-                'percentile_25': series.quantile(0.25),
-                'percentile_75': series.quantile(0.75),
-                'iqr': series.quantile(0.75) - series.quantile(0.25)
+                "mean": series.mean(),
+                "max": series.max(),
+                "min": series.min(),
+                "median": series.median(),
+                "std": series.std(),
+                "variance": series.var(),
+                "skewness": series.skew(),
+                "kurtosis": series.kurt(),
+                "range": series.max() - series.min(),
+                "percentile_25": series.quantile(0.25),
+                "percentile_75": series.quantile(0.75),
+                "iqr": series.quantile(0.75) - series.quantile(0.25),
             }
         return stats
 
-    def compute_temporal_features(self,df):
-        import numpy as np
-        from scipy.signal import find_peaks
+    def compute_temporal_features(self, df):
 
         temp_feats = {}
         for col in df.columns:
@@ -198,14 +195,14 @@ class Preprocessor(FileOperator):
             troughs, _ = find_peaks(-values)
 
             temp_feats[col] = {
-                'first_derivative_mean': np.mean(gradient),
-                'second_derivative_mean': np.mean(second_derivative),
-                'num_zero_crossings': len(zero_crossings),
-                'num_peaks': len(peaks),
-                'num_troughs': len(troughs)
+                "first_derivative_mean": np.mean(gradient),
+                "second_derivative_mean": np.mean(second_derivative),
+                "num_zero_crossings": len(zero_crossings),
+                "num_peaks": len(peaks),
+                "num_troughs": len(troughs),
             }
         return temp_feats
-    
+
     def compute_frequency_features(self, df: pd.DataFrame) -> dict:
         freq_feats = {}
         for col in df.columns:
@@ -214,15 +211,11 @@ class Preprocessor(FileOperator):
 
             n = len(values)
             if n == 0:
-                freq_feats[col] = {
-                    'dominant_frequency': 0,
-                    'spectral_energy': 0,
-                    'spectral_entropy': 0
-                }
+                freq_feats[col] = {"dominant_frequency": 0, "spectral_energy": 0, "spectral_entropy": 0}
                 continue
 
-            fft_vals = np.abs(fft(values))[:n // 2]
-            freqs = np.fft.fftfreq(n)[:n // 2]
+            fft_vals = np.abs(fft(values))[: n // 2]
+            freqs = np.fft.fftfreq(n)[: n // 2]
 
             if np.sum(fft_vals) == 0:
                 dominant_freq = 0
@@ -230,20 +223,19 @@ class Preprocessor(FileOperator):
                 spectral_entropy = 0
             else:
                 dominant_freq = freqs[np.argmax(fft_vals)]
-                spectral_energy = np.sum(fft_vals ** 2)
+                spectral_energy = np.sum(fft_vals**2)
                 p = fft_vals / np.sum(fft_vals)
                 spectral_entropy = -np.sum(p * np.log2(p + 1e-10))
 
             freq_feats[col] = {
-                'dominant_frequency': dominant_freq,
-                'spectral_energy': spectral_energy,
-                'spectral_entropy': spectral_entropy
+                "dominant_frequency": dominant_freq,
+                "spectral_energy": spectral_energy,
+                "spectral_entropy": spectral_entropy,
             }
 
         return freq_feats
 
-
-    def extract_features_from_force_df(self,df:pd.DataFrame) -> pd.DataFrame:
+    def extract_features_from_force_df(self, df: pd.DataFrame) -> pd.DataFrame:
         features = {}
 
         stats = self.compute_statistical_features(df)
@@ -251,17 +243,14 @@ class Preprocessor(FileOperator):
         freq = self.compute_frequency_features(df)
 
         for col in df.columns:
-            features[col] = {
-                **stats[col],
-                **temp[col],
-                **freq[col]
-            }
+            features[col] = {**stats[col], **temp[col], **freq[col]}
 
         return pd.DataFrame(features).T  # return as a nice DataFrame
-    
-    def rename_duplicated_columns(self,df:pd.DataFrame) -> pd.DataFrame:
+
+    def rename_duplicated_columns(self, df):
         counts = {}
         new_cols = []
+
         for col in df.columns:
             if col in counts:
                 counts[col] += 1
@@ -269,51 +258,58 @@ class Preprocessor(FileOperator):
             else:
                 counts[col] = 0
                 new_cols.append(col)
+
         df.columns = new_cols
-        return df
-    
-    def vertical_side(self,df:pd.DataFrame):
+
+    def vertical_side(self, df: pd.DataFrame):
         """
         Making df with columns time_step, Vertical 2.78 Side 2.78
-        
+
         :return:
         List of DataFrames where on index time_step and two columns: Vertical and Side forces
         """
         pair_dfs = []
         col_names = [col for col in df.columns if col != "time_step" and not col.startswith("Side")]
         for col in col_names:
-            pair_cols = ["time_step",col,col.replace("Vertical","Side")]
-            valid_df:pd.DataFrame = df[pair_cols]
-            valid_df.set_index("time_step",inplace=True)
+            pair_cols = ["time_step", col, col.replace("Vertical", "Side")]
+            valid_df: pd.DataFrame = df[pair_cols]
+            valid_df.set_index("time_step", inplace=True)
             pair_dfs.append(valid_df)
         return pair_dfs
 
-    def split_by_time(self,dfs:list[pd.DataFrame]) -> list:
+    def split_by_time(self, dfs: list[pd.DataFrame]) -> list:
         small_dfs = []
         for df in dfs:
             segments = self.split_df_by_time_indices(df)  # list of split DataFrames
             small_dfs.append(segments)
         return small_dfs
 
-    def extract_features(self,dfs:list[pd.DataFrame]):
+    def update_column_names(self, dfs, hook=False):
+        for df in dfs:
+            self.rename_duplicated_columns(df)
+
+        if hook:
+            self.save(dfs, f"hook_{uuid.uuid4().hex[:3]}")
+
+        return dfs
+
+    def extract_features(self, dfs: list[pd.DataFrame]):
         features = []
         for part in dfs:
-            # mark duplicated columns with _1, _2, _3... etc.
-            part = self.rename_duplicated_columns(part)
             # Extract features from each segment excpects that in df in columns are names "Vertical 8.3345..."
             feat_df = self.extract_features_from_force_df(part)  # shape: (num_columns, num_features)
             features.append(feat_df)
         return features
-    
-    def combine_forces(self,vertical_features:list[pd.DataFrame],side_features:list[pd.DataFrame]) -> pd.DataFrame:
+
+    def combine_forces(self, vertical_features: list[pd.DataFrame], side_features: list[pd.DataFrame]) -> pd.DataFrame:
         v_s = []
-        for s,v in zip(side_features,vertical_features):
+        for s, v in zip(side_features, vertical_features):
             v = v.add_prefix("vertical_").reset_index(drop=True)
             s = s.add_prefix("side_").reset_index(drop=True)
-            v_s.append(pd.concat([v,s],axis=1))
-        return pd.concat(v_s,axis=0)
-    
-    def set_dtypes(self,dfs:list[pd.DataFrame]) -> pd.DataFrame:
+            v_s.append(pd.concat([v, s], axis=1))
+        return pd.concat(v_s, axis=0)
+
+    def set_dtypes(self, dfs: list[pd.DataFrame]) -> pd.DataFrame:
         for df in dfs:
             # Set each column's dtype from config.Preprocessor.DTYPES_OUT
             for col, dtype in config.Preprocessor.DTYPES_OUT.items():
@@ -321,7 +317,7 @@ class Preprocessor(FileOperator):
                     df[col] = df[col].astype(dtype)
         return dfs
 
-    def preprocess_file_results(self, filepath: str) -> pd.DataFrame:
+    def preprocess_file_results(self, filepath: str, hook: bool = False) -> pd.DataFrame:
         """
         Preprocess the results of a simulation file.
 
@@ -330,15 +326,20 @@ class Preprocessor(FileOperator):
         """
         logger.debug(f"Preprocessing file: {filepath}")
         self.is_straight = True if "straight" in os.path.basename(filepath).split("_") else False
-        df = self.load_csv(filepath) # load csv file
-        df = self._reset_column_names(df) # as column names are weird clean them
-        idxs = self._get_split_index(df) # as simulation results go one by one in one column, searching for indexes where split them
-        df_vertical,df_side = self._split_data(df, idxs) # split the data into smaller DataFrames based on the indices
-
+        df = self.load_csv(filepath)  # load csv file
+        df = self._reset_column_names(df)  # as column names are weird clean them
+        idxs = self._get_split_index(
+            df
+        )  # as simulation results go one by one in one column, searching for indexes where split them
+        df_vertical, df_side = self._split_data(df, idxs)  # split the data into smaller DataFrames based on the indices
 
         # Here we will split separated dfs into smaller dfs based on wheel rotation time
         df_vertical_all = self.split_by_time(df_vertical)
         df_side_all = self.split_by_time(df_side)
+
+        # update column names
+        df_vertical_all = self.update_column_names(df_vertical_all, hook)
+        df_side_all = self.update_column_names(df_side_all, hook)
 
         # now as we have splitted dfs we need to extract features from them
         vertical_features = self.extract_features(df_vertical_all)
@@ -347,25 +348,28 @@ class Preprocessor(FileOperator):
         vertical_features = self.set_dtypes(vertical_features)
         side_features = self.set_dtypes(side_features)
 
-        combined_forces = self.combine_forces(vertical_features,side_features).reset_index(drop=True).replace(0.0,config.Preprocessor.ZERO_VALUE)
+        combined_forces = (
+            self.combine_forces(vertical_features, side_features)
+            .reset_index(drop=True)
+            .replace(0.0, config.Preprocessor.ZERO_VALUE)
+        )
 
         # Add target column based on filename
         filename = os.path.basename(filepath)
         fault_target = 1 if any(keyword in filename for keyword in config.SimulationNames.FAULTS) else 0
-        
+
         filename_profile = [profile for profile in config.SimulationNames.PROFILES if profile in filename]
-        
+
         if filename_profile:
-            profile_target = config.SimulationNames.PROFILE_TARGET.get(filename_profile[0],0)
+            profile_target = config.SimulationNames.PROFILE_TARGET.get(filename_profile[0], 0)
         else:
             print(f"Profile not found in filename: {filename}")
         combined_forces["fault_target"] = fault_target
         combined_forces["profile_target"] = profile_target
-        
+
         gc.collect()  # Force garbage collection to free up memory
         return combined_forces
 
-    
     def preprocess_all_files(self) -> pd.DataFrame:
 
         versions = os.listdir(config.Paths._EMPTY)
@@ -384,40 +388,47 @@ class Preprocessor(FileOperator):
             for version, fnames in zip(versions, loaded_fnames)
             for fname in fnames
         ]
-        
+
         # Combine all paths into on list
         all_paths = empty_paths + loaded_paths
         n_files = len(all_paths)
 
         dfs = []
         for fpath in tqdm(all_paths, desc="Preprocessing files", total=n_files):
-
-            df = self.preprocess_file_results(fpath)
+            hook = False
+            if fpath in loaded_paths and "straight" in fpath and "polzun" not in fpath and "ellips" not in fpath:
+                hook = True
+            df = self.preprocess_file_results(fpath, hook)
             dfs.append(df)
-        
+
         # Concatenate all DataFrames into one
         final_df = pd.concat(dfs, axis=0)
         self.save(final_df, "preprocessed_data")
- 
+
     def data_augmentation(self) -> pd.DataFrame:
-        
-        df:pd.DataFrame = self.load("preprocessed_data").fillna(config.Preprocessor.ZERO_VALUE)
+
+        df: pd.DataFrame = self.load("preprocessed_data").fillna(config.Preprocessor.ZERO_VALUE)
         # Create a copy of the DataFrame for augmentation
         # As we have 2 types of targets we will make 2 augmentations for each target due to targets distributions
-        CATEGORICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.CATEGORICAL_DTYPES, config.Preprocessor.PREFIXES)
-        NUMERICAL_DTYPES:dict = apply_prefix_to_dtype_dict(config.Preprocessor.NUMERICAL_DTYPES, config.Preprocessor.PREFIXES)
+        CATEGORICAL_DTYPES: dict = apply_prefix_to_dtype_dict(
+            config.Preprocessor.CATEGORICAL_DTYPES, config.Preprocessor.PREFIXES
+        )
+        NUMERICAL_DTYPES: dict = apply_prefix_to_dtype_dict(
+            config.Preprocessor.NUMERICAL_DTYPES, config.Preprocessor.PREFIXES
+        )
 
-        
         for target in tqdm(config.Preprocessor.TARGETS, desc="Augmenting data", total=len(config.Preprocessor.TARGETS)):
-            X = df.drop(config.Preprocessor.TARGETS,axis=1).copy()
+            X = df.drop(config.Preprocessor.TARGETS, axis=1).copy()
             feature_cols = X.columns
             y = df[target].copy()
 
             categorical_columns = [X.columns.get_loc(col) for col in list(CATEGORICAL_DTYPES.keys())]
 
-            smotenc = SMOTENC(categorical_features=categorical_columns,
-                                sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
-                                random_state=config.Common.SEED)
+            smotenc = SMOTENC(
+                categorical_features=categorical_columns,
+                sampling_strategy=config.Preprocessor.SAMPLE_STRATEGY,
+                random_state=config.Common.SEED,
+            )
             # Apply SMOTENC to the DataFrame
             X_aug, y_aug = smotenc.fit_resample(X, y)
 
@@ -429,33 +440,32 @@ class Preprocessor(FileOperator):
                 if col in augmented_df.columns:
                     augmented_df[col] = augmented_df[col].round().clip(lower=config.Preprocessor.ZERO_VALUE)
 
-            
-            augmented_df = augmented_df.astype({
-                **CATEGORICAL_DTYPES,
-                **NUMERICAL_DTYPES,
-            })
-
+            augmented_df = augmented_df.astype(
+                {
+                    **CATEGORICAL_DTYPES,
+                    **NUMERICAL_DTYPES,
+                }
+            )
 
             # Standardize float columns
-            augmented_floats = standardize_float_columns(augmented_df, ignore_cols=list(CATEGORICAL_DTYPES.keys()) + [target])
+            augmented_floats = standardize_float_columns(
+                augmented_df, ignore_cols=list(CATEGORICAL_DTYPES.keys()) + [target]
+            )
             augmented_df[augmented_floats.columns] = augmented_floats
             # Reorder columns to have categorical columns first
             augmented_df = cats_first_floats_later(augmented_df)
-            
+
             # Store and save augmented DataFrame
             self.save(augmented_df, f"preprocessed_data_{target}")
             gc.collect()  # Force garbage collection to free up memory
-    
+
     def preprocess(self):
         """
         Preprocess the data by loading, cleaning, and saving it.
         """
-        
-        if self.is_data_preprocessed() == False:
-            print(self.is_data_preprocessed())
-            self.preprocess_all_files()
-            self.data_augmentation()
-        logger.debug(
-            "Data is already preprocessed, "
-            "Start training models"
-        )
+
+        # if self.is_data_preprocessed() == False:
+        #     print(self.is_data_preprocessed())
+        self.preprocess_all_files()
+        # self.data_augmentation()
+        logger.debug("Data is already preprocessed, " "Start training models")
