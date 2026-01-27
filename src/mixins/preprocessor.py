@@ -66,6 +66,34 @@ class Preprocessor(FileOperator):
 
         return idxs
 
+    def split_side_vertical(self, df, indexes, neg_threshold=0.4, min_magnitude_ratio=0.1):
+        """
+        Classifies segments as 'side' or 'vertical' using sign + magnitude behavior
+        """
+
+        values = df.iloc[:, 1].to_numpy()
+        result = {"side": [], "vertical": []}
+
+        global_scale = np.percentile(np.abs(values), 90)
+
+        for i in range(len(indexes) - 1):
+            start, end = indexes[i], indexes[i + 1]
+            seg = values[start:end]
+
+            if len(seg) == 0:
+                continue
+
+            neg_ratio = np.mean(seg < 0)
+            mean_mag = np.mean(np.abs(seg))
+
+            # rule that mimics visual intuition
+            is_side = neg_ratio >= neg_threshold or mean_mag < min_magnitude_ratio * global_scale
+
+            label = "side" if is_side else "vertical"
+            result[label].append((start, end))
+
+        return result
+
     def _get_rotation_indices_for_column(self, df: pd.DataFrame, col: str) -> np.ndarray:
         """
         Calculate split indices for a single column based on wheel rotation time.
@@ -111,50 +139,58 @@ class Preprocessor(FileOperator):
 
         return pd.concat(all_segments, axis=1)
 
-    def _split(self, df: pd.DataFrame, idxs: list, vertical: bool = True):
-        """Split DataFrame by indices into blocks"""
+    def _split(self, df: pd.DataFrame, idxs: dict, vertical: bool = True):
+        """
+        Split DataFrame into force blocks by indices and direction.
+
+        :param df: Input DataFrame with cleaned column names
+        :param idxs: Dict with keys 'side' and 'vertical',
+                    values are lists of (start, end) index tuples
+        :param vertical: If True extract vertical forces, else side forces
+        :return: List of DataFrames, one per force column
+        """
         results = []
 
-        if len(idxs) <= 1:
+        # Select index ranges based on direction
+        segment_key = "vertical" if vertical else "side"
+        segments = idxs.get(segment_key, [])
+
+        if not segments:
             return results
 
-        # Выбираем нужный столбец в зависимости от типа
-        force_col = df.columns[1] if vertical else df.columns[2]  # или правильный индекс
+        # Get all non-time columns
+        all_cols = [col for col in df.columns if col != "time_step"]
 
-        n_blocks = 12
-        start_block = 0 if vertical else n_blocks
-        end_block = n_blocks if vertical else 2 * n_blocks
+        # Filter force columns by direction
+        if vertical:
+            force_cols = [col for col in all_cols if "Vertical" in str(col)]
+        else:
+            force_cols = [col for col in all_cols if "Side" in str(col)]
 
-        for i in range(start_block, end_block):
-            if i + 1 >= len(idxs):
-                continue
+        # For each force column, extract data from relevant segments
+        for col in force_cols:
+            run_dfs = []
 
-            start, end = idxs[i], idxs[i + 1]
-            speed = round((i - start_block + 1) * 10 / 3.6, 2)
+            for start_idx, end_idx in segments:
+                block_df = df.iloc[start_idx:end_idx][["time_step", col]].copy()
 
-            block_df = df.iloc[start:end][["time_step", force_col]].copy()
-            block_df = block_df.dropna(subset=[force_col])
+                # Skip empty or NaN-only blocks
+                if block_df[col].isna().all():
+                    continue
 
-            if block_df.empty:
-                continue
+                block_df = block_df.dropna(subset=[col])
 
-            block_df.set_index("time_step", inplace=True)
+                if not block_df.empty:
+                    block_df.set_index("time_step", inplace=True)
+                    run_dfs.append(block_df)
 
-            force_type = "Vertical" if vertical else "Side"
-            col_name = f"{force_type} {speed}"
-            block_df = block_df.rename(columns={force_col: col_name})
-            results.append(block_df)
+            # Concatenate all runs for this column
+            if run_dfs:
+                combined_df = pd.concat(run_dfs, axis=0)
+                combined_df.index.name = "time_step"
+                results.append(combined_df)
 
         return results
-
-    def _split_data(self, df: pd.DataFrame, idxs: list) -> tuple[list, list]:
-
-        verticals = self._split(df, idxs)
-        sides = self._split(df, idxs, False)
-
-        for v, s in zip(verticals, sides):
-            print(v.columns[0], v.min().values[0], "|", s.columns[0], s.min().values[0])
-        return verticals, sides
 
     def compute_statistical_features(self, df: pd.DataFrame) -> dict:
         stats = {}
@@ -293,7 +329,7 @@ class Preprocessor(FileOperator):
         for df in dfs:
             self.rename_duplicated_columns(df)
 
-        if hook:
+        if hook and dfs:
             self.save(dfs, f"hook_{uuid.uuid4().hex[:3]}")
 
         return dfs
@@ -307,12 +343,36 @@ class Preprocessor(FileOperator):
         return features
 
     def combine_forces(self, vertical_features: list[pd.DataFrame], side_features: list[pd.DataFrame]) -> pd.DataFrame:
+        """
+        Combine vertical and side force features.
+
+        If one list is empty, just return the other with appropriate prefixes.
+        Otherwise, zip and concatenate pairs.
+        """
         v_s = []
-        for s, v in zip(side_features, vertical_features):
-            v = v.add_prefix("vertical_").reset_index(drop=True)
-            s = s.add_prefix("side_").reset_index(drop=True)
-            v_s.append(pd.concat([v, s], axis=1))
-        return pd.concat(v_s, axis=0)
+
+        # Handle case where one list is empty
+        if not vertical_features and not side_features:
+            return pd.DataFrame()  # Both empty
+
+        if not side_features:
+            # Only vertical features
+            for v in vertical_features:
+                v = v.add_prefix("vertical_").reset_index(drop=True)
+                v_s.append(v)
+        elif not vertical_features:
+            # Only side features
+            for s in side_features:
+                s = s.add_prefix("side_").reset_index(drop=True)
+                v_s.append(s)
+        else:
+            # Both have data - pair them up
+            for s, v in zip(side_features, vertical_features):
+                v = v.add_prefix("vertical_").reset_index(drop=True)
+                s = s.add_prefix("side_").reset_index(drop=True)
+                v_s.append(pd.concat([v, s], axis=1))
+
+        return pd.concat(v_s, axis=0) if v_s else pd.DataFrame()
 
     def set_dtypes(self, dfs: list[pd.DataFrame]) -> pd.DataFrame:
         for df in dfs:
@@ -326,30 +386,46 @@ class Preprocessor(FileOperator):
         """
         Preprocess the results of a simulation file.
 
-        :param filename: The name of the file to preprocess.
-        :return: A DataFrame containing the preprocessed data.
+        Pipeline:
+        1. Load CSV and clean column names
+        2. Find temporal boundaries (where simulation runs are separated)
+        3. Split data by force direction (vertical/side), extracting data from all runs
+        4. Split each force block by wheel rotation time
+        5. Extract statistical, temporal, and frequency features
+        6. Combine and add target labels
+
+        :param filepath: Path to the CSV file to preprocess.
+        :param hook: If True, save intermediate results for debugging.
+        :return: A DataFrame with extracted features and target labels.
         """
         logger.debug(f"Preprocessing file: {filepath}")
-        self.is_straight = True if "straight" in os.path.basename(filepath).split("_") else False
-        df = self.load_csv(filepath)  # load csv file
-        df = self._reset_column_names(df)  # as column names are weird clean them
-        idxs = self._get_split_index(
-            df
-        )  # as simulation results go one by one in one column, searching for indexes where split them
-        df_vertical, df_side = self._split_data(df, idxs)  # split the data into smaller DataFrames based on the indices
+        filename = os.path.basename(filepath)
+        self.is_straight = "straight" in filename.split("_")
 
-        # Here we will split separated dfs into smaller dfs based on wheel rotation time
-        df_vertical_all = self.split_by_time(df_vertical)
-        df_side_all = self.split_by_time(df_side)
+        # ===== STEP 1: Load and clean data =====
+        df = self.load_csv(filepath)
+        df = self._reset_column_names(df)
 
-        # update column names
-        df_vertical_all = self.update_column_names(df_vertical_all, hook)
-        df_side_all = self.update_column_names(df_side_all, hook)
+        # ===== STEP 2: Find temporal boundaries =====
+        idxs = self._get_split_index(df)
+        index_groups = self.split_side_vertical(df, idxs)
 
-        # now as we have splitted dfs we need to extract features from them
-        vertical_features = self.extract_features(df_vertical_all)
-        side_features = self.extract_features(df_side_all)
+        # ===== STEP 3: Split by force direction =====
+        vertical_blocks = self._split(df, index_groups, vertical=True)
+        side_blocks = self._split(df, index_groups, vertical=False)
 
+        # ===== STEP 4: Split by wheel rotation time =====
+        vertical_segments = self.split_by_time(vertical_blocks)
+        side_segments = self.split_by_time(side_blocks)
+
+        # ===== STEP 5: Update column names and extract features =====
+        vertical_segments = self.update_column_names(vertical_segments, hook)
+        side_segments = self.update_column_names(side_segments, hook)
+
+        vertical_features = self.extract_features(vertical_segments)
+        side_features = self.extract_features(side_segments)
+
+        # ===== STEP 6: Set dtypes and combine =====
         vertical_features = self.set_dtypes(vertical_features)
         side_features = self.set_dtypes(side_features)
 
@@ -359,20 +435,16 @@ class Preprocessor(FileOperator):
             .replace(0.0, config.Preprocessor.ZERO_VALUE)
         )
 
-        # Add target column based on filename
-        filename = os.path.basename(filepath)
-        fault_target = 1 if any(keyword in filename for keyword in config.SimulationNames.FAULTS) else 0
+        # ===== STEP 7: Add target labels =====
+        fault_target = 1 if any(kw in filename for kw in config.SimulationNames.FAULTS) else 0
 
-        filename_profile = [profile for profile in config.SimulationNames.PROFILES if profile in filename]
+        matching_profiles = [p for p in config.SimulationNames.PROFILES if p in filename]
+        profile_target = config.SimulationNames.PROFILE_TARGET.get(matching_profiles[0], 0) if matching_profiles else 0
 
-        if filename_profile:
-            profile_target = config.SimulationNames.PROFILE_TARGET.get(filename_profile[0], 0)
-        else:
-            print(f"Profile not found in filename: {filename}")
         combined_forces["fault_target"] = fault_target
         combined_forces["profile_target"] = profile_target
 
-        gc.collect()  # Force garbage collection to free up memory
+        gc.collect()
         return combined_forces
 
     def preprocess_all_files(self) -> pd.DataFrame:

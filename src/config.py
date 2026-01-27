@@ -63,7 +63,7 @@ class Preprocessor:
         "X ",
         "]",
     ]
-    IGNORE_COLUMNS = ["Unnamed: 24", "Unnamed: 16"]
+    IGNORE_COLUMNS = ["Unnamed: 24", "Unnamed: 16", "X Side", "X Vertical"]
 
     ZERO_VALUE = 1e-6
 
