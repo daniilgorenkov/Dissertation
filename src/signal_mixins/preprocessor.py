@@ -221,7 +221,7 @@ class SignalPreprocessor(FileOperator):
                         min_threshold = 23.0
                         wheel_peaks = self.find_wheel_impacts(forces, even=even)
                     else:
-                        max_threshold = SignalPreprocessorConfig.SIDE_FORCE_PEAK_THESHOLD
+                        max_threshold = SignalPreprocessorConfig.SIDE_FORCE_PEAK_THRESHOLD
                         min_threshold = -max_threshold
                         wheel_peaks = self.find_wheel_impacts(forces, False, even=even)
 

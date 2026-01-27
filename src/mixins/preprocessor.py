@@ -112,35 +112,38 @@ class Preprocessor(FileOperator):
         return pd.concat(all_segments, axis=1)
 
     def _split(self, df: pd.DataFrame, idxs: list, vertical: bool = True):
+        """Split DataFrame by indices into blocks"""
         results = []
 
-        switcher = 12 if self.is_straight else 8
+        if len(idxs) <= 1:
+            return results
 
-        if vertical == True:
-            columns = [col for col in df.columns if col.startswith("Vertical")]
-            for idx, col in zip(range(len(idxs) - 1), columns):
+        # Выбираем нужный столбец в зависимости от типа
+        force_col = df.columns[1] if vertical else df.columns[2]  # или правильный индекс
 
-                start = idxs[idx]
-                end = idxs[idx + 1]
+        n_blocks = 12
+        start_block = 0 if vertical else n_blocks
+        end_block = n_blocks if vertical else 2 * n_blocks
 
-                upd_df = df.iloc[start:end].iloc[:, :2]  # taking only first two columns cuz our results are in 2 column
-                upd_df.columns = ["time_step", col]
-                upd_df.set_index("time_step", inplace=True, drop=True)
-                results.append(upd_df)
+        for i in range(start_block, end_block):
+            if i + 1 >= len(idxs):
+                continue
 
-        elif vertical == False:
-            columns = [col for col in df.columns if col.startswith("Side")]
+            start, end = idxs[i], idxs[i + 1]
+            speed = round((i - start_block + 1) * 10 / 3.6, 2)
 
-            idxs = idxs[switcher:]  # 8 or 12 depends on curve or straight
+            block_df = df.iloc[start:end][["time_step", force_col]].copy()
+            block_df = block_df.dropna(subset=[force_col])
 
-            for idx, col in zip(range(len(idxs) - 1), columns):
+            if block_df.empty:
+                continue
 
-                start = idxs[idx]
-                end = idxs[idx + 1]
-                upd_df = df.iloc[start:end].iloc[:, :2]  # taking only first two columns cuz our results are in 2 column
-                upd_df.columns = ["time_step", col]
-                upd_df.set_index("time_step", inplace=True, drop=True)
-                results.append(upd_df)
+            block_df.set_index("time_step", inplace=True)
+
+            force_type = "Vertical" if vertical else "Side"
+            col_name = f"{force_type} {speed}"
+            block_df = block_df.rename(columns={force_col: col_name})
+            results.append(block_df)
 
         return results
 
@@ -149,6 +152,8 @@ class Preprocessor(FileOperator):
         verticals = self._split(df, idxs)
         sides = self._split(df, idxs, False)
 
+        for v, s in zip(verticals, sides):
+            print(v.columns[0], v.min().values[0], "|", s.columns[0], s.min().values[0])
         return verticals, sides
 
     def compute_statistical_features(self, df: pd.DataFrame) -> dict:

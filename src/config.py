@@ -22,8 +22,8 @@ class SignalPreprocessorConfig:
 
     ALLOWED_EXTENSIONS = (".mera", ".dat")
     SEQUENCES = ["А", "Б", "В"]
-    VERTICAL_FORCE_PEAK_THRESHOLD = 35
-    SIDE_FORCE_PEAK_THESHOLD: float = 1.5
+    VERTICAL_FORCE_PEAK_THRESHOLD = 350
+    SIDE_FORCE_PEAK_THRESHOLD: float = 30
     GROUP_RANGES = [
         {"v": 20, "start": 541, "end": 546},  # 0541–0546
         {"v": 40, "start": 547, "end": 552},  # 0547–0552
