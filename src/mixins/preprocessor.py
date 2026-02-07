@@ -158,14 +158,10 @@ class Preprocessor(FileOperator):
         if not segments:
             return results
 
-        # Get all non-time columns
+        # Get all non-time columns - ВСЕ колонки, не фильтруем по имени!
+        # Потому что split_side_vertical уже определил ВРЕМЕННЫЕ сегменты
         all_cols = [col for col in df.columns if col != "time_step"]
-
-        # Filter force columns by direction
-        if vertical:
-            force_cols = [col for col in all_cols if "Vertical" in str(col)]
-        else:
-            force_cols = [col for col in all_cols if "Side" in str(col)]
+        force_cols = all_cols  # Используем ВСЕ колонки
 
         # For each force column, extract data from relevant segments
         for col in force_cols:
@@ -324,6 +320,30 @@ class Preprocessor(FileOperator):
             segments = self.split_df_by_time_indices(df)  # list of split DataFrames
             small_dfs.append(segments)
         return small_dfs
+    def trim_segments(self, dfs: list[pd.DataFrame], head_trim: int = 0, tail_trim: int = 0) -> list[pd.DataFrame]:
+        """
+        Trim beginning and end of each segment to remove noise/transients.
+
+        :param dfs: List of DataFrames to trim
+        :param head_trim: Number of rows to remove from beginning
+        :param tail_trim: Number of rows to remove from end
+        :return: List of trimmed DataFrames
+        """
+        if head_trim <= 0 and tail_trim <= 0:
+            return dfs
+        
+        trimmed = []
+        for df in dfs:
+            if df is None or df.empty:
+                trimmed.append(df)
+                continue
+            
+            start = head_trim if head_trim > 0 else 0
+            end = -tail_trim if tail_trim > 0 else None
+            df_trimmed = df.iloc[start:end].copy()
+            trimmed.append(df_trimmed)
+        
+        return trimmed
 
     def update_column_names(self, dfs, hook=False):
         for df in dfs:
@@ -382,7 +402,7 @@ class Preprocessor(FileOperator):
                     df[col] = df[col].astype(dtype)
         return dfs
 
-    def preprocess_file_results(self, filepath: str, hook: bool = False) -> pd.DataFrame:
+    def preprocess_file_results(self, filepath: str, hook: bool = False, head_trim: int = 500, tail_trim: int = 10) -> pd.DataFrame:
         """
         Preprocess the results of a simulation file.
 
@@ -391,11 +411,14 @@ class Preprocessor(FileOperator):
         2. Find temporal boundaries (where simulation runs are separated)
         3. Split data by force direction (vertical/side), extracting data from all runs
         4. Split each force block by wheel rotation time
-        5. Extract statistical, temporal, and frequency features
-        6. Combine and add target labels
+        5. Trim segments to remove noise/transients
+        6. Extract statistical, temporal, and frequency features
+        7. Combine and add target labels
 
         :param filepath: Path to the CSV file to preprocess.
         :param hook: If True, save intermediate results for debugging.
+        :param head_trim: Number of rows to remove from beginning of each segment (default 500).
+        :param tail_trim: Number of rows to remove from end of each segment (default 10).
         :return: A DataFrame with extracted features and target labels.
         """
         logger.debug(f"Preprocessing file: {filepath}")
@@ -418,14 +441,18 @@ class Preprocessor(FileOperator):
         vertical_segments = self.split_by_time(vertical_blocks)
         side_segments = self.split_by_time(side_blocks)
 
-        # ===== STEP 5: Update column names and extract features =====
+        # ===== STEP 5: Trim segments to remove noise =====
+        vertical_segments = self.trim_segments(vertical_segments, head_trim=head_trim, tail_trim=tail_trim)
+        side_segments = self.trim_segments(side_segments, head_trim=head_trim, tail_trim=tail_trim)
+
+        # ===== STEP 6: Update column names and extract features =====
         vertical_segments = self.update_column_names(vertical_segments, hook)
         side_segments = self.update_column_names(side_segments, hook)
 
         vertical_features = self.extract_features(vertical_segments)
         side_features = self.extract_features(side_segments)
 
-        # ===== STEP 6: Set dtypes and combine =====
+        # ===== STEP 7: Set dtypes and combine =====
         vertical_features = self.set_dtypes(vertical_features)
         side_features = self.set_dtypes(side_features)
 
@@ -435,7 +462,7 @@ class Preprocessor(FileOperator):
             .replace(0.0, config.Preprocessor.ZERO_VALUE)
         )
 
-        # ===== STEP 7: Add target labels =====
+        # ===== STEP 8: Add target labels =====
         fault_target = 1 if any(kw in filename for kw in config.SimulationNames.FAULTS) else 0
 
         matching_profiles = [p for p in config.SimulationNames.PROFILES if p in filename]

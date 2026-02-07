@@ -111,24 +111,28 @@ class Trainer:
     N_TRIALS = 2
     PRINT_ITERATION: int = 50
     PROFILE_BOOST_PARAMS = {
-        "iterations": 516,
+        "iterations": 5000,
         "depth": 5,
         "learning_rate": 0.13211202488090648,
         "l2_leaf_reg": 9.43485032895685,
         "random_strength": 0.7151665545857637,
         "bagging_temperature": 0.11412417323963553,
         "border_count": 171,
+        "od_type": "Iter",
+        "od_wait": 100,
         "random_seed": Common.SEED,
         "task_type": "GPU",
     }
     FAULT_BOOST_PARAMS = {
-        "iterations": 381,
+        "iterations": 5000,
         "depth": 3,
         "learning_rate": 0.2689777123362394,
         "l2_leaf_reg": 9.523826971416215,
         "random_strength": 0.5632573376683527,
         "bagging_temperature": 0.41075176991945006,
         "border_count": 230,
+        "od_type": "Iter",
+        "od_wait": 100,
         "random_seed": Common.SEED,
         "task_type": "GPU",
     }
