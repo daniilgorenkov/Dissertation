@@ -1,4 +1,4 @@
-from pipelines.catboost_pipe import CatBoostPipe
+from pipelines.cb.catboost_pipe import CatBoostPipe
 
 
 def run_pipeline():
