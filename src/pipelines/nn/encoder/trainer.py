@@ -63,13 +63,13 @@ class Trainer(FileOperator):
         val_loader = DataLoader(val_ds, batch_size=self.batch_size, shuffle=False)
         return train_loader, val_loader
 
-    def train_step(self, batch):
+    def train_step(self, batch, alpha: float = 0.0):
         batch = {k: v.to(self.device) for k, v in batch.items()}
         fault, profile = self.model(batch["X"])
 
         loss_fault = self.loss_fn(fault, batch["y_fault"])
         loss_profile = self.loss_fn(profile, batch["y_profile"])
-        loss = loss_fault + loss_profile
+        loss = loss_fault + alpha + loss_profile
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -77,7 +77,7 @@ class Trainer(FileOperator):
 
         return loss.item(), loss_fault.item(), loss_profile.item()
 
-    def train(self, epochs: int = 10, early_stopping_patience: int = 15, eval_every: int = 5):
+    def train(self, epochs: int = 10, early_stopping_patience: int = 15, eval_every: int = 5, alpha: float = 0.0):
         train_loader, val_loader = self.train_val_split()
 
         loss_tracker = {}
@@ -91,7 +91,7 @@ class Trainer(FileOperator):
             batch_profile_loss = []
 
             for batch in train_loader:
-                loss, loss_fault, loss_profile = self.train_step(batch)
+                loss, loss_fault, loss_profile = self.train_step(batch, alpha)
                 batch_loss.append(loss)
                 batch_fault_loss.append(loss_fault)
                 batch_profile_loss.append(loss_profile)
@@ -105,12 +105,12 @@ class Trainer(FileOperator):
             self.logger.report_scalar("loss", "train_fault", mean_fault_loss, epoch)
             self.logger.report_scalar("loss", "train_profile", mean_profile_loss, epoch)
 
-            print(
-                f"Epoch {epoch+1}/{epochs} | "
-                f"loss={mean_loss:.4f} | "
-                f"fault={mean_fault_loss:.4f} | "
-                f"profile={mean_profile_loss:.4f}"
-            )
+            # print(
+            #     f"Epoch {epoch+1}/{epochs} | "
+            #     f"loss={mean_loss:.4f} | "
+            #     f"fault={mean_fault_loss:.4f} | "
+            #     f"profile={mean_profile_loss:.4f}"
+            # )
 
             if epoch % eval_every == 0 or epoch == epochs - 1:
                 metrics = self.evaluate(val_loader)

@@ -22,8 +22,13 @@ class WheelModel(nn.Module):
         self.encoder = SignalEncoder(n_points, patch, d_model, dropout)
 
         self.pool = nn.AdaptiveAvgPool1d(1)
+        self.profile_proj = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.GELU(),
+            nn.Dropout(0.1),
+        )
 
-        self.fault_head = nn.Linear(d_model, 2)  # исправное/неисправное
+        self.fault_head = nn.Sequential(nn.Linear(d_model, 2), nn.GELU())  # исправное/неисправное
         self.profile_head = nn.Linear(d_model, 3)  # 0 - новое, 1 - изношенное, 2 - критическое
 
     def forward(self, x):
@@ -34,6 +39,8 @@ class WheelModel(nn.Module):
         t = self.pool(t).squeeze(-1)  # (B,128)
 
         fault = self.fault_head(t)
-        profile = self.profile_head(t)
+
+        profile_proj = self.profile_proj(t)
+        profile = self.profile_head(profile_proj)
 
         return fault, profile
